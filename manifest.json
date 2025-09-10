@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "Bug Shot Turbo (for TAPD)",
+  "version": "0.1.0",
+  "description": "一次输入，处处复用 - 极速提交TAPD缺陷",
+  
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "clipboardWrite",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  
+  "action": {
+    "default_popup": "ui/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  
+  "options_page": "ui/options.html",
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/annotator-outline.js"],
+      "css": ["content/annotator.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.tapd.tencent.com/*",
+        "*://*.tapd.cn/*"
+      ],
+      "js": ["content/tapd-filler.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["ui/panel.html", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  
+  "commands": {
+    "toggle-annotation": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "mac": "Alt+S",
+        "windows": "Alt+S",
+        "linux": "Alt+S"
+      },
+      "description": "开启/关闭标注工具"
+    }
+  }
+}

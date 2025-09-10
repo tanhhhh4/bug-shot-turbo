@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Bug Shot Turbo</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <img src="../assets/icons/icon48.png" alt="Logo" class="logo">
+      <div class="header-text">
+        <h1>Bug Shot Turbo</h1>
+        <p class="tagline">一次输入，处处复用</p>
+      </div>
+    </header>
+    
+    <main class="popup-content">
+      <section class="quick-actions">
+        <button id="startCapture" class="btn btn-primary">
+          <span class="icon">📸</span>
+          开始截图标注
+          <span class="shortcut">Alt+S</span>
+        </button>
+      </section>
+      
+      <section class="recent-bugs">
+        <h3>最近的缺陷</h3>
+        <div id="recentList" class="recent-list">
+          <div class="empty-state">暂无记录</div>
+        </div>
+      </section>
+      
+      <section class="statistics">
+        <h3>使用统计</h3>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-value" id="totalBugs">0</span>
+            <span class="stat-label">总提交数</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="successRate">0%</span>
+            <span class="stat-label">成功率</span>
+          </div>
+        </div>
+      </section>
+    </main>
+    
+    <footer class="popup-footer">
+      <button id="openOptions" class="btn-text">设置</button>
+      <button id="clearData" class="btn-text">清除数据</button>
+      <button id="openHelp" class="btn-text">帮助</button>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Bug Shot Turbo - 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <header class="options-header">
+      <h1>Bug Shot Turbo 设置</h1>
+      <p>自定义您的缺陷提交工具</p>
+    </header>
+    
+    <main class="options-content">
+      <section class="option-section">
+        <h2>TAPD项目配置</h2>
+        <div class="option-group">
+          <label for="tapdProjectIds">项目ID列表</label>
+          <input type="text" id="tapdProjectIds" placeholder="47910877, 12345678">
+          <small>输入TAPD项目ID，多个ID用逗号分隔。项目ID可在TAPD的URL中找到</small>
+        </div>
+        
+        <div class="option-group">
+          <label for="tapdDomains">TAPD域名</label>
+          <input type="text" id="tapdDomains" placeholder="tapd.cn, tapd.tencent.com" value="tapd.cn, tapd.tencent.com">
+          <small>支持的TAPD域名，通常不需要修改</small>
+        </div>
+      </section>
+      
+      <section class="option-section">
+        <h2>TAPD选择器配置</h2>
+        <div class="option-group">
+          <label for="titleSelector">标题字段选择器</label>
+          <input type="text" id="titleSelector" placeholder="input[name='bug[title]']">
+          <small>用于定位TAPD缺陷标题输入框的CSS选择器</small>
+        </div>
+        
+        <div class="option-group">
+          <label for="descIframeSelector">描述iframe选择器</label>
+          <input type="text" id="descIframeSelector" placeholder="iframe.ke-edit-iframe">
+          <small>用于定位TAPD富文本编辑器iframe的CSS选择器</small>
+        </div>
+        
+        <div class="option-group">
+          <label for="descBodySelector">描述内容选择器</label>
+          <input type="text" id="descBodySelector" placeholder="body.ke-content">
+          <small>iframe内部可编辑区域的CSS选择器</small>
+        </div>
+      </section>
+      
+      <section class="option-section">
+        <h2>模板配置</h2>
+        <div class="option-group">
+          <label for="titleTemplate">标题模板</label>
+          <input type="text" id="titleTemplate" placeholder="${issue}（${pathLast1}）">
+          <small>支持变量：${issue}, ${firstTag}, ${pathLast1}, ${timestamp}</small>
+        </div>
+        
+        <div class="option-group">
+          <label for="descTemplate">描述模板</label>
+          <textarea id="descTemplate" rows="8" placeholder="【问题】${firstTag} - ${issue}
+【页面】${pageURL}
+【时间】${timestamp}
+【期望】<在此补充>
+【实际】<在此补充>
+（截图：粘贴后见下）"></textarea>
+          <small>支持变量：${issue}, ${firstTag}, ${pageURL}, ${pathLast1}, ${timestamp}</small>
+        </div>
+      </section>
+      
+      <section class="option-section">
+        <h2>标签设置</h2>
+        <div class="tags-config">
+          <div class="tag-item" data-index="0">
+            <span class="tag-number">1</span>
+            <input type="text" class="tag-input" placeholder="按钮失效">
+          </div>
+          <div class="tag-item" data-index="1">
+            <span class="tag-number">2</span>
+            <input type="text" class="tag-input" placeholder="表单校验">
+          </div>
+          <div class="tag-item" data-index="2">
+            <span class="tag-number">3</span>
+            <input type="text" class="tag-input" placeholder="样式错位">
+          </div>
+          <div class="tag-item" data-index="3">
+            <span class="tag-number">4</span>
+            <input type="text" class="tag-input" placeholder="接口报错">
+          </div>
+          <div class="tag-item" data-index="4">
+            <span class="tag-number">5</span>
+            <input type="text" class="tag-input" placeholder="其他">
+          </div>
+        </div>
+      </section>
+      
+      <section class="option-section">
+        <h2>快捷键设置</h2>
+        <div class="option-group">
+          <label>开启/关闭标注工具</label>
+          <div class="shortcut-display">Alt + S</div>
+          <small>Chrome扩展快捷键需要在扩展管理页面设置</small>
+        </div>
+      </section>
+      
+      <section class="option-section">
+        <h2>数据管理</h2>
+        <div class="data-actions">
+          <button id="exportData" class="btn btn-secondary">导出配置</button>
+          <button id="importData" class="btn btn-secondary">导入配置</button>
+          <button id="resetDefaults" class="btn btn-secondary">恢复默认</button>
+          <button id="clearHistory" class="btn btn-danger">清除历史</button>
+        </div>
+      </section>
+    </main>
+    
+    <footer class="options-footer">
+      <button id="saveOptions" class="btn btn-primary">保存设置</button>
+      <div id="saveStatus" class="save-status"></div>
+    </footer>
+  </div>
+  
+  <input type="file" id="fileInput" style="display: none;" accept=".json">
+  
+  <script src="options.js"></script>
+</body>
+</html>
