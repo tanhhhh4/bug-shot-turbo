@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bug Shot Turbo - Tags Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Bug Shot Turbo - Tags System Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Tags Configuration Test</h2>
+        <button onclick="testTagsConfig()">Test Tags Config</button>
+        <div id="config-log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Tags Manager Test</h2>
+        <button onclick="testTagsManager()">Test Tags Manager</button>
+        <div id="manager-log" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Tags Renderer Test</h2>
+        <button onclick="testTagsRenderer()">Test Tags Renderer</button>
+        <div id="renderer-log" class="log"></div>
+        <div id="renderer-output"></div>
+    </div>
+
+    <script src="config/default-tags.js"></script>
+    <script src="config/tags-manager.js"></script>
+    <script src="content/tags-renderer.js"></script>
+    
+    <script>
+        function log(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+        }
+        
+        async function testTagsConfig() {
+            const logId = 'config-log';
+            log(logId, 'Testing BST_TagsConfig...');
+            
+            try {
+                if (window.BST_TagsConfig) {
+                    log(logId, '✅ BST_TagsConfig loaded');
+                    log(logId, `Default tags count: ${window.BST_TagsConfig.DEFAULT_TAGS_V2.length}`);
+                    log(logId, `Color palette count: ${window.BST_TagsConfig.COLOR_PALETTE.length}`);
+                    
+                    // Test migration
+                    const oldTags = ['测试标签1', '测试标签2'];
+                    const migrated = window.BST_TagsConfig.migrateTagsFromV1(oldTags);
+                    log(logId, `✅ Migration test: ${migrated.length} tags created`);
+                } else {
+                    log(logId, '❌ BST_TagsConfig not available');
+                }
+            } catch (error) {
+                log(logId, '❌ Error: ' + error.message);
+            }
+        }
+        
+        async function testTagsManager() {
+            const logId = 'manager-log';
+            log(logId, 'Testing BST_TagsManager...');
+            
+            try {
+                if (window.BST_TagsManager) {
+                    log(logId, '✅ BST_TagsManager loaded');
+                    
+                    await window.BST_TagsManager.init();
+                    log(logId, '✅ Manager initialized');
+                    
+                    const tags = window.BST_TagsManager.getAllTags();
+                    log(logId, `Current tags count: ${tags.length}`);
+                    
+                    const favorites = window.BST_TagsManager.getFavoriteTags();
+                    log(logId, `Favorite tags count: ${favorites.length}`);
+                } else {
+                    log(logId, '❌ BST_TagsManager not available');
+                }
+            } catch (error) {
+                log(logId, '❌ Error: ' + error.message);
+            }
+        }
+        
+        async function testTagsRenderer() {
+            const logId = 'renderer-log';
+            const outputId = 'renderer-output';
+            log(logId, 'Testing BST_TagsRenderer...');
+            
+            try {
+                if (window.BST_TagsRenderer) {
+                    log(logId, '✅ BST_TagsRenderer loaded');
+                    
+                    await window.BST_TagsRenderer.init();
+                    log(logId, '✅ Renderer initialized');
+                    
+                    const html = window.BST_TagsRenderer.renderTagSelector({
+                        showSearch: true,
+                        allowQuickCreate: true,
+                        showRecent: true,
+                        showFavorites: true
+                    });
+                    
+                    document.getElementById(outputId).innerHTML = html;
+                    log(logId, '✅ Tags rendered successfully');
+                    
+                    // Bind events
+                    const container = document.getElementById(outputId);
+                    window.BST_TagsRenderer.bindEvents(container, (selectedTag) => {
+                        log(logId, `Tag selected: ${selectedTag.name}`);
+                    });
+                    log(logId, '✅ Events bound successfully');
+                } else {
+                    log(logId, '❌ BST_TagsRenderer not available');
+                }
+            } catch (error) {
+                log(logId, '❌ Error: ' + error.message);
+                console.error('Renderer test error:', error);
+            }
+        }
+        
+        // Auto-run basic tests
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testTagsConfig();
+                testTagsManager();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

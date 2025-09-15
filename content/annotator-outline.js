@@ -11,7 +11,12 @@ class ScreenshotAnnotator {
     this.frozenBackground = null;
     this.screenshot = null;
     
-    // 一个BUG多个框选区域支持
+    // 单区域逐个模式的存储
+    this.selections = [];  // 所有已保存的BUG数据
+    this.currentSelectionRect = null;
+    this.currentSelection = null;
+    
+    // 多区域统一模式的存储
     this.currentBug = {
       selections: [],  // 多个框选区域
       issue: '',       // 统一问题描述
@@ -27,6 +32,178 @@ class ScreenshotAnnotator {
 
   init() {
     this.setupListeners();
+  }
+
+  async initTagsRenderer() {
+    try {
+      // 检查TagsRenderer是否可用
+      if (!window.BST_TagsRenderer) {
+        console.warn('BST Annotator: Tags renderer not available, will use fallback');
+        return;
+      }
+
+      // 只有TagsRenderer可用时才初始化
+      await window.BST_TagsRenderer.init();
+      console.log('BST Annotator: Tags renderer initialized');
+    } catch (error) {
+      console.error('BST Annotator: Tags system initialization failed:', error);
+      console.warn('BST Annotator: Will use fallback tags');
+    }
+  }
+
+  async renderUnifiedTags() {
+    const container = this.inputPanel.querySelector('#bst-unified-tags-container');
+    if (!container) return;
+
+    // 检查TagsRenderer可用性
+    if (!window.BST_TagsRenderer || typeof window.BST_TagsRenderer.renderTagSelector !== 'function') {
+      console.warn('BST Annotator: TagsRenderer not available, using fallback');
+      this.renderFallbackTags(container);
+      this.bindFallbackTagEvents(container, 'unified');
+      return;
+    }
+
+    try {
+      // 确保TagsRenderer已初始化
+      if (typeof window.BST_TagsRenderer.init === 'function') {
+        await window.BST_TagsRenderer.init();
+      }
+
+      const tagsHtml = window.BST_TagsRenderer.renderTagSelector({
+        showSearch: true,
+        allowQuickCreate: false,
+        showRecent: false,
+        showFavorites: false,
+        maxRecent: 0,
+        compactView: false
+      });
+      
+      if (!tagsHtml || tagsHtml.trim() === '') {
+        throw new Error('Empty tags HTML returned from renderer');
+      }
+
+      container.innerHTML = tagsHtml;
+      
+      // 添加动态样式
+      this.addTagsRendererStyles();
+      
+      // 绑定事件 - 延迟到 setupUnifiedPanelButtonStates 中处理，以包含按钮状态更新
+      if (typeof window.BST_TagsRenderer.bindEvents !== 'function') {
+        console.warn('BST Annotator: bindEvents not available, using fallback events');
+        this.bindFallbackTagEvents(container, 'unified');
+      }
+      
+      console.log('BST Annotator: Unified tags rendered successfully');
+    } catch (error) {
+      console.error('BST Annotator: Failed to render unified tags:', error);
+      console.warn('BST Annotator: Falling back to static tags');
+      // 回退到硬编码标签
+      this.renderFallbackTags(container);
+      this.bindFallbackTagEvents(container, 'unified');
+    }
+  }
+
+  async renderSingleTags() {
+    const container = this.inputPanel.querySelector('#bst-single-tags-container');
+    if (!container) return;
+
+    if (!window.BST_TagsRenderer) {
+      console.warn('BST Annotator: TagsRenderer not available, using fallback');
+      this.renderFallbackTags(container);
+      this.bindFallbackTagEvents(container, 'single');
+      return;
+    }
+
+    try {
+      const tagsHtml = window.BST_TagsRenderer.renderTagSelector({
+        showSearch: false,
+        allowQuickCreate: false,
+        showRecent: true,
+        showFavorites: true,
+        maxRecent: 6,
+        compactView: true
+      });
+      
+      container.innerHTML = tagsHtml;
+      
+      // 添加动态样式
+      this.addTagsRendererStyles();
+      
+      // 绑定事件
+      window.BST_TagsRenderer.bindEvents(container, (selectedTag) => {
+        // 单个标注时使用 selectedTag 变量
+        this.currentSelectedTag = selectedTag.name;
+        console.log('BST Annotator: Selected tag for single annotation:', selectedTag);
+      });
+      
+      console.log('BST Annotator: Single tags rendered');
+    } catch (error) {
+      console.error('BST Annotator: Failed to render single tags:', error);
+      // 回退到硬编码标签
+      this.renderFallbackTags(container);
+      this.bindFallbackTagEvents(container, 'single');
+    }
+  }
+
+  renderFallbackTags(container) {
+    // 回退到硬编码标签列表
+    container.innerHTML = `
+      <button class="bst-tag" data-tag="按钮失效">按钮失效</button>
+      <button class="bst-tag" data-tag="表单校验">表单校验</button>
+      <button class="bst-tag" data-tag="样式错位">样式错位</button>
+      <button class="bst-tag" data-tag="接口报错">接口报错</button>
+      <button class="bst-tag" data-tag="其他">其他</button>
+    `;
+    console.log('BST Annotator: Using fallback tags');
+  }
+
+  bindFallbackTagEvents(container, type) {
+    // 简单的标签选择事件回退
+    const tags = container.querySelectorAll('.bst-tag');
+    tags.forEach(tag => {
+      tag.addEventListener('click', (e) => {
+        // 清除其他选择
+        tags.forEach(t => t.classList.remove('active'));
+        // 选择当前标签
+        e.target.classList.add('active');
+        
+        if (type === 'unified') {
+          this.currentBug.tag = e.target.dataset.tag;
+        } else if (type === 'single') {
+          this.currentSelectedTag = e.target.dataset.tag;
+        }
+        
+        console.log('BST Annotator: Fallback tag selected:', e.target.dataset.tag);
+      });
+    });
+    console.log('BST Annotator: Fallback tag events bound for', type);
+  }
+
+  addTagsRendererStyles() {
+    const styleId = 'bst-tags-renderer-styles';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = window.BST_TagsRenderer ? window.BST_TagsRenderer.getStyles() : '';
+    document.head.appendChild(style);
+  }
+
+  async saveTagUsage() {
+    if (!window.BST_TagsManager || !this.currentBug.tag) return;
+
+    try {
+      // 查找选中标签的ID
+      const selectedTag = window.BST_TagsManager.getAllTags().find(tag => tag.name === this.currentBug.tag);
+      if (selectedTag) {
+        await window.BST_TagsManager.recordTagUsage(selectedTag.id);
+        await window.BST_TagsManager.flushUsageStats();
+        console.log('BST Annotator: Tag usage saved for', this.currentBug.tag);
+      }
+    } catch (error) {
+      console.error('BST Annotator: Failed to save tag usage:', error);
+      // 不抛出错误，避免影响主流程
+    }
   }
 
   setupListeners() {
@@ -58,7 +235,10 @@ class ScreenshotAnnotator {
           console.log('BST: Enter detected - starting description phase');
           e.preventDefault();
           e.stopPropagation();
-          this.startDescriptionPhase();
+          // 异步调用，不阻塞事件处理
+          this.startDescriptionPhase().catch(error => {
+            console.error('BST: Failed to start description phase:', error);
+          });
           return false;
         }
       }
@@ -76,9 +256,11 @@ class ScreenshotAnnotator {
   async activate() {
     this.isActive = true;
     
-    // 获取全局BUG计数
-    const result = await chrome.storage.local.get(['totalBugs']);
-    const bugNumber = (result.totalBugs || 0) + 1;
+    // 初始化标签渲染器
+    await this.initTagsRenderer();
+    
+    // 强制编号从1开始
+    const bugNumber = 1;
     
     // 重置当前BUG数据
     this.currentBug = {
@@ -104,21 +286,30 @@ class ScreenshotAnnotator {
 
   async captureAndFreezeScreen() {
     try {
+      // 检查Chrome扩展环境
+      if (!chrome?.runtime?.sendMessage) {
+        throw new Error('Chrome runtime not available');
+      }
+
       const response = await chrome.runtime.sendMessage({ 
         action: 'captureVisibleTab' 
       });
       
-      if (response.success) {
+      if (response?.success) {
         this.screenshot = response.dataUrl;
         // 创建静态截图背景层，完全覆盖原始页面
         this.createFrozenBackground();
       } else {
-        console.error('Failed to capture screenshot:', response.error);
+        console.error('Failed to capture screenshot:', response?.error);
         this.showError('截图失败，请重试');
       }
     } catch (error) {
       console.error('Screenshot error:', error);
-      this.showError('截图失败: ' + error.message);
+      if (error.message?.includes('Could not establish connection')) {
+        this.showError('扩展连接失败，请刷新页面重试');
+      } else {
+        this.showError('截图失败: ' + error.message);
+      }
     }
   }
 
@@ -299,7 +490,7 @@ class ScreenshotAnnotator {
   }
 
 
-  startDescriptionPhase() {
+  async startDescriptionPhase() {
     // 当用户按Alt+Enter时，进入描述阶段
     console.log('BST: startDescriptionPhase called, selections:', this.currentBug.selections.length);
     
@@ -312,7 +503,7 @@ class ScreenshotAnnotator {
     console.log('BST: Entering description phase...');
     this.currentBug.status = 'describing';
     this.overlay.style.pointerEvents = 'none';
-    this.showUnifiedInputPanel();
+    await this.showUnifiedInputPanel();
   }
 
   showInitialTooltip() {
@@ -385,7 +576,7 @@ class ScreenshotAnnotator {
         order: this.currentBug.bugNumber  // 同一个BUG的所有框选使用相同编号
       };
       
-      // 添加到当前BUG的选择列表
+      // 添加到当前BUG的选择列表（支持多个区域）
       this.currentBug.selections.push(selection);
       
       // 创建持久化的选择框显示
@@ -459,7 +650,7 @@ class ScreenshotAnnotator {
     }
   }
 
-  showUnifiedInputPanel() {
+  async showUnifiedInputPanel() {
     // 创建统一的多框选输入面板
     this.inputPanel = document.createElement('div');
     this.inputPanel.className = 'bst-unified-input-panel';
@@ -483,12 +674,8 @@ class ScreenshotAnnotator {
           </div>
           <div class="bst-tags">
             <label>选择标签：</label>
-            <div class="bst-tag-list">
-              <button class="bst-tag" data-tag="按钮失效">按钮失效</button>
-              <button class="bst-tag" data-tag="表单校验">表单校验</button>
-              <button class="bst-tag" data-tag="样式错位">样式错位</button>
-              <button class="bst-tag" data-tag="接口报错">接口报错</button>
-              <button class="bst-tag" data-tag="其他">其他</button>
+            <div class="bst-tag-list" id="bst-unified-tags-container">
+              <!-- 动态生成的标签列表 -->
             </div>
           </div>
           <div class="bst-input-field">
@@ -507,6 +694,12 @@ class ScreenshotAnnotator {
     this.addUnifiedInputPanelStyles();
     this.positionInputPanel();
     document.body.appendChild(this.inputPanel);
+    
+    // 渲染动态标签
+    this.renderUnifiedTags().catch(error => {
+      console.error('BST: Failed to render unified tags:', error);
+    });
+    
     this.bindUnifiedInputPanelEvents();
     
     // 聚焦输入框
@@ -745,38 +938,72 @@ class ScreenshotAnnotator {
       this.cancel();
     });
     
-    // 返回继续框选
+    // 返回继续框选（保存当前BUG并开始新的BUG）
     this.inputPanel.querySelector('#bst-back-to-select').addEventListener('click', () => {
+      // 读取当前输入框的内容
+      const issueInput = this.inputPanel.querySelector('#bst-unified-issue-input');
+      const issue = issueInput?.value.trim() || '';
+      
+      // 检查保存条件
+      if (!issue) {
+        this.showToast('请输入问题描述', 'warning');
+        issueInput?.focus();
+        return;
+      }
+      
+      if (!this.currentBug.tag) {
+        this.showToast('请选择问题标签', 'warning');
+        return;
+      }
+      
+      if (this.currentBug.selections.length === 0) {
+        this.showToast('请先框选至少一个区域', 'warning');
+        return;
+      }
+      
+      // 同步状态
+      this.currentBug.issue = issue;
+      
+      // 保存当前BUG的数据到全局数组
+      this.currentBug.selections.forEach(sel => {
+        const savedSelection = {
+          rect: sel,
+          tag: this.currentBug.tag,
+          issue: issue, // 使用实际输入的值
+          bugNumber: this.currentBug.bugNumber
+        };
+        this.selections.push(savedSelection);
+        console.log('BST: Saved selection to global array:', savedSelection);
+      });
+      
+      // 为已保存的区域创建持久显示
+      this.currentBug.selections.forEach((sel, index) => {
+        this.createSavedSelectionDisplay({
+          rect: sel,
+          tag: this.currentBug.tag,
+          issue: issue
+        }, this.selections.length - this.currentBug.selections.length + index + 1);
+      });
+      
+      // 关闭面板
       this.inputPanel.remove();
       this.inputPanel = null;
       
-      // 开始新的BUG会话，增加BUG编号
+      // 只有保存成功才清空并开始新的BUG会话
       this.currentBug.bugNumber++;
       this.currentBug.selections = [];
       this.currentBug.issue = '';
       this.currentBug.tag = '';
       this.currentBug.status = 'selecting';
       
-      // 清理当前选择框元素
-      this.selectionElements.forEach(element => {
-        if (element && element.remove) {
-          element.remove();
-        }
-      });
+      // 不清理已保存的选择框，只清理临时的
       this.selectionElements = [];
       
       this.overlay.style.pointerEvents = 'auto';
-      this.showToast(`开始新的BUG #${this.currentBug.bugNumber}，继续框选区域`, 'info');
+      this.showToast(`BUG #${this.currentBug.bugNumber - 1} 已保存，开始新的BUG #${this.currentBug.bugNumber}`, 'success');
     });
     
-    // 标签选择
-    this.inputPanel.querySelectorAll('.bst-tag').forEach(tag => {
-      tag.addEventListener('click', (e) => {
-        this.inputPanel.querySelectorAll('.bst-tag').forEach(t => t.classList.remove('active'));
-        e.target.classList.add('active');
-        this.currentBug.tag = e.target.dataset.tag;
-      });
-    });
+    // 标签选择由 TagsRenderer 处理，无需额外绑定
     
     // 提交按钮
     this.inputPanel.querySelector('#bst-submit-unified').addEventListener('click', () => {
@@ -789,9 +1016,61 @@ class ScreenshotAnnotator {
         this.submitUnifiedBug();
       }
     });
+    
+    // 添加动态按钮状态管理
+    this.setupUnifiedPanelButtonStates();
+  }
+  
+  setupUnifiedPanelButtonStates() {
+    const issueInput = this.inputPanel.querySelector('#bst-unified-issue-input');
+    const backButton = this.inputPanel.querySelector('#bst-back-to-select');
+    const submitButton = this.inputPanel.querySelector('#bst-submit-unified');
+    
+    const updateButtonStates = () => {
+      const hasIssue = issueInput?.value.trim();
+      const hasTag = this.currentBug.tag;
+      const hasSelections = this.currentBug.selections.length > 0;
+      
+      const canProceed = hasIssue && hasTag && hasSelections;
+      
+      if (backButton) {
+        backButton.disabled = !canProceed;
+        backButton.style.opacity = canProceed ? '1' : '0.5';
+        backButton.style.cursor = canProceed ? 'pointer' : 'not-allowed';
+      }
+      
+      if (submitButton) {
+        submitButton.disabled = !canProceed;
+        submitButton.style.opacity = canProceed ? '1' : '0.5';
+        submitButton.style.cursor = canProceed ? 'pointer' : 'not-allowed';
+      }
+    };
+    
+    // 监听输入框变化
+    if (issueInput) {
+      issueInput.addEventListener('input', updateButtonStates);
+    }
+    
+    // 监听标签变化 - 修改标签设置逻辑以触发更新
+    const originalTagSetter = (selectedTag) => {
+      this.currentBug.tag = selectedTag.name;
+      console.log('BST Annotator: Selected tag for unified bug:', selectedTag);
+      updateButtonStates(); // 标签变化时更新按钮状态
+    };
+    
+    // 重新绑定标签事件以包含按钮状态更新
+    if (window.BST_TagsRenderer && typeof window.BST_TagsRenderer.bindEvents === 'function') {
+      const container = this.inputPanel.querySelector('#bst-unified-tags-container');
+      if (container) {
+        window.BST_TagsRenderer.bindEvents(container, originalTagSetter);
+      }
+    }
+    
+    // 初始状态更新
+    updateButtonStates();
   }
 
-  submitUnifiedBug() {
+  async submitUnifiedBug() {
     const issueInput = this.inputPanel.querySelector('#bst-unified-issue-input');
     const issue = issueInput.value.trim();
     
@@ -810,8 +1089,24 @@ class ScreenshotAnnotator {
     this.currentBug.issue = issue;
     this.currentBug.status = 'completed';
     
-    // 生成BUG数据并保存
-    this.generateUnifiedBugData();
+    // 保存当前BUG的所有选择区域到全局selections数组
+    this.currentBug.selections.forEach(sel => {
+      this.selections.push({
+        rect: sel,
+        tag: this.currentBug.tag,
+        issue: this.currentBug.issue,
+        bugNumber: this.currentBug.bugNumber
+      });
+    });
+    
+    // 关闭输入面板
+    if (this.inputPanel) {
+      this.inputPanel.remove();
+      this.inputPanel = null;
+    }
+    
+    // 使用单区域模式的提交方法，它会正确处理this.selections
+    await this.finishAndSubmit();
   }
 
   async generateUnifiedBugData() {
@@ -839,17 +1134,32 @@ class ScreenshotAnnotator {
       await this.generateCompositeImage(bugData);
       
       // 保存数据
-      const response = await chrome.runtime.sendMessage({
-        action: 'saveBugData',
-        data: bugData
-      });
-      
-      if (response.success) {
-        // 更新全局BUG计数
-        await chrome.storage.local.set({ totalBugs: this.currentBug.bugNumber });
+      let response;
+      try {
+        if (!chrome?.runtime?.sendMessage) {
+          throw new Error('Chrome runtime not available');
+        }
         
+        response = await chrome.runtime.sendMessage({
+          action: 'saveBugData',
+          data: bugData
+        });
+      } catch (error) {
+        console.error('BST: Failed to save bug data:', error);
+        if (error.message?.includes('Could not establish connection')) {
+          this.showError('扩展连接失败，数据可能未保存');
+        } else {
+          this.showError('保存失败: ' + error.message);
+        }
+        return;
+      }
+      
+      if (response?.success) {
         // 复制到剪贴板
         await this.copyToClipboard(bugData);
+        
+        // 保存标签使用统计
+        await this.saveTagUsage();
         
         // 显示成功消息
         this.showSuccessWithRedirect(`已生成BUG #${this.currentBug.bugNumber}（包含 ${this.currentBug.selections.length} 个区域）`);
@@ -1050,7 +1360,7 @@ class ScreenshotAnnotator {
     });
   }
 
-  showInputPanel() {
+  async showInputPanel() {
     this.overlay.style.pointerEvents = 'none';
     
     const index = this.selections.length + 1;
@@ -1066,12 +1376,8 @@ class ScreenshotAnnotator {
         <div class="bst-input-body">
           <div class="bst-tags">
             <label>选择标签：</label>
-            <div class="bst-tag-list">
-              <button class="bst-tag" data-tag="按钮失效">按钮失效</button>
-              <button class="bst-tag" data-tag="表单校验">表单校验</button>
-              <button class="bst-tag" data-tag="样式错位">样式错位</button>
-              <button class="bst-tag" data-tag="接口报错">接口报错</button>
-              <button class="bst-tag" data-tag="其他">其他</button>
+            <div class="bst-tag-list" id="bst-single-tags-container">
+              <!-- 动态生成的标签列表 -->
             </div>
           </div>
           <div class="bst-input-field">
@@ -1092,6 +1398,12 @@ class ScreenshotAnnotator {
     this.addInputPanelStyles();
     this.positionInputPanel();
     document.body.appendChild(this.inputPanel);
+    
+    // 渲染动态标签
+    this.renderSingleTags().catch(error => {
+      console.error('BST: Failed to render single tags:', error);
+    });
+    
     this.bindInputPanelEvents();
     
     setTimeout(() => {
@@ -1310,15 +1622,16 @@ class ScreenshotAnnotator {
     let selectedTag = null;
     let issueText = '';
     
-    const tags = this.inputPanel.querySelectorAll('.bst-tag');
-    tags.forEach(tag => {
-      tag.addEventListener('click', () => {
-        tags.forEach(t => t.classList.remove('active'));
-        tag.classList.add('active');
-        selectedTag = tag.dataset.tag;
+    // 标签选择由 TagsRenderer 处理，监听 currentSelectedTag 变化
+    const checkTagSelection = () => {
+      if (this.currentSelectedTag !== selectedTag) {
+        selectedTag = this.currentSelectedTag;
         this.updateButtons(selectedTag, issueText);
-      });
-    });
+      }
+    };
+    
+    // 定期检查标签选择状态
+    this.tagCheckInterval = setInterval(checkTagSelection, 100);
     
     const input = document.getElementById('bst-issue-input');
     input.addEventListener('input', (e) => {
@@ -1489,10 +1802,22 @@ class ScreenshotAnnotator {
       selections: this.selections.map(sel => ({
         rect: sel.rect,
         tag: sel.tag,
-        issue: sel.issue
+        issue: sel.issue,
+        bugNumber: sel.bugNumber
       })),
       timestamp: new Date().toLocaleString('zh-CN')
     };
+    
+    console.log('BST: Final bugData before screenshot:', bugData);
+    console.log('BST: Total selections:', bugData.selections.length);
+    bugData.selections.forEach((sel, index) => {
+      console.log(`BST: Selection ${index + 1}:`, {
+        bugNumber: sel.bugNumber,
+        tag: sel.tag,
+        issue: sel.issue,
+        rect: sel.rect
+      });
+    });
     
     await this.compositeScreenshot(bugData);
     await this.saveBugData(bugData);
@@ -1530,7 +1855,7 @@ class ScreenshotAnnotator {
         ctx.rect(0, 0, canvas.width, canvas.height);
         
         // 从整个路径中"挖掉"选择区域（创建洞）
-        this.selections.forEach((sel, index) => {
+        bugData.selections.forEach((sel, index) => {
           const rect = sel.rect;
           ctx.rect(rect.x * dpr, rect.y * dpr, rect.width * dpr, rect.height * dpr);
         });
@@ -1539,7 +1864,8 @@ class ScreenshotAnnotator {
         ctx.fill('evenodd');
         ctx.restore();
         
-        this.selections.forEach((sel, index) => {
+        // 在单区域逐个模式下，每个区域都有独立的标签和描述
+        bugData.selections.forEach((sel, index) => {
           const rect = sel.rect;
           
           // 绘制边框
@@ -1551,7 +1877,8 @@ class ScreenshotAnnotator {
           const labelX = rect.x * dpr;
           
           ctx.fillStyle = '#ff6b6b';
-          const labelText = `#${index + 1}`;
+          // 使用bugNumber作为标签，相同BUG显示相同编号
+          const labelText = `#${sel.bugNumber || 1}`;
           ctx.font = `bold ${12 * dpr}px Arial`;
           const labelWidth = ctx.measureText(labelText).width;
           
@@ -1560,6 +1887,7 @@ class ScreenshotAnnotator {
           ctx.fillStyle = 'white';
           ctx.fillText(labelText, labelX + 5 * dpr, labelY - 3 * dpr);
           
+          // 在单区域逐个模式下，每个区域使用自己的标签和描述
           const descText = `[${sel.tag}] ${sel.issue}`;
           ctx.font = `${14 * dpr}px Arial`;
           const descWidth = ctx.measureText(descText).width;
@@ -1582,14 +1910,45 @@ class ScreenshotAnnotator {
         
         bugData.screenshot = canvas.toDataURL('image/png');
         
-        bugData.issuesSummary = this.selections.map((sel, index) => 
-          `${index + 1}. [${sel.tag}] ${sel.issue}`
-        ).join('\n');
+        // 按BUG分组生成摘要
+        const bugGroups = {};
+        bugData.selections.forEach(sel => {
+          const bugNum = sel.bugNumber || 1;
+          if (!bugGroups[bugNum]) {
+            bugGroups[bugNum] = {
+              tag: sel.tag,
+              issue: sel.issue,
+              count: 0,
+              regions: []
+            };
+          }
+          bugGroups[bugNum].count++;
+          bugGroups[bugNum].regions.push(sel);
+        });
         
-        bugData.firstTag = this.selections[0].tag;
-        bugData.issue = this.selections.length > 1 
-          ? `${this.selections.length}个问题` 
-          : this.selections[0].issue;
+        // 生成详细的问题摘要
+        const bugNumbers = Object.keys(bugGroups).sort((a, b) => a - b);
+        bugData.issuesSummary = bugNumbers.map(num => {
+          const bug = bugGroups[num];
+          return `BUG #${num}: [${bug.tag}] ${bug.issue} (${bug.count}个区域)`;
+        }).join('\n');
+        
+        bugData.firstTag = bugData.selections[0].tag;
+        
+        // 生成标题：如果有多个BUG，显示每个BUG的描述
+        if (bugNumbers.length > 1) {
+          // 多个BUG时，标题包含所有BUG描述
+          bugData.issue = bugNumbers.map(num => {
+            const bug = bugGroups[num];
+            return `${num}. ${bug.issue}`;
+          }).join('；');
+        } else if (bugData.selections.length > 1) {
+          // 单个BUG多个区域
+          bugData.issue = `${bugData.selections[0].issue}（${bugData.selections.length}个区域）`;
+        } else {
+          // 单个BUG单个区域
+          bugData.issue = bugData.selections[0].issue;
+        }
         
         resolve();
       };
@@ -1892,6 +2251,12 @@ class ScreenshotAnnotator {
     if (this.inputPanel) {
       this.inputPanel.remove();
       this.inputPanel = null;
+    }
+    
+    // 4.1. 清理标签检查定时器
+    if (this.tagCheckInterval) {
+      clearInterval(this.tagCheckInterval);
+      this.tagCheckInterval = null;
     }
     
     // 5. 清理当前BUG的所有选择框元素

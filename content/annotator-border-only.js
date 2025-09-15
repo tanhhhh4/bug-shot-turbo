@@ -650,9 +650,15 @@ class ScreenshotAnnotator {
         ).join('\n');
         
         bugData.firstTag = this.selections[0].tag;
-        bugData.issue = this.selections.length > 1 
-          ? `${this.selections.length}个问题` 
-          : this.selections[0].issue;
+        
+        // 修复标题生成逻辑：使用第一个问题描述而不是"X个问题"
+        if (this.selections.length > 1) {
+          // 多个问题时，显示第一个问题描述 + 问题数量
+          bugData.issue = `${this.selections[0].issue}等${this.selections.length}个问题`;
+        } else {
+          // 单个问题时，直接使用问题描述
+          bugData.issue = this.selections[0].issue;
+        }
         
         resolve();
       };

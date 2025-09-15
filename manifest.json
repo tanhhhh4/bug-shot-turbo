@@ -34,7 +34,12 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/annotator-outline.js"],
+      "js": [
+        "config/default-tags.js",
+        "config/tags-manager.js", 
+        "content/tags-renderer.js",
+        "content/annotator-outline.js"
+      ],
       "css": ["content/annotator.css"],
       "run_at": "document_idle"
     },
