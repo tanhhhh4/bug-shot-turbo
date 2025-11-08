@@ -56,8 +56,8 @@ class TapdAutoFiller {
           descBody: "body#tinymce, body.mce-content-body"
         },
         templates: {
-          title: "${issue}（${pathLast1}）",
-          description: "【问题】${firstTag} - ${issue}\n【页面】${pageURL}\n【时间】${timestamp}\n【期望】<在此补充>\n【实际】<在此补充>\n（截图：粘贴后见下）"
+          title: "${rectangleList}（${pathLast1}）",
+          description: "【问题类型】${firstTag}\n\n【详细说明】\n${rectangleList}\n\n【页面地址】${pageURL}\n【发现时间】${timestamp}\n【附件截图】粘贴后见下方（Ctrl/Cmd+V）"
         }
       };
     } catch (error) {
@@ -219,6 +219,15 @@ class TapdAutoFiller {
       if (key === 'issue' && data.issuesSummary) {
         return data.issuesSummary;
       }
+
+      // 处理矩形标注列表（新功能）
+      if (key === 'rectangleList') {
+        if (data.rectangles && Array.isArray(data.rectangles) && data.rectangles.length > 0) {
+          return data.rectangles.map(r => `${r.order}、${r.text}`).join('\n');
+        }
+        return '（无详细标注）';
+      }
+
       return data[key] || '';
     });
   }

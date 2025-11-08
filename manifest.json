@@ -36,9 +36,9 @@
       "matches": ["<all_urls>"],
       "js": [
         "config/default-tags.js",
-        "config/tags-manager.js", 
+        "config/tags-manager.js",
         "content/tags-renderer.js",
-        "content/annotator-outline.js"
+        "content/annotator-rectangle-tool.js"
       ],
       "css": ["content/annotator.css"],
       "run_at": "document_idle"

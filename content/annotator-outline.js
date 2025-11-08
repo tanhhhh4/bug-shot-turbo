@@ -365,15 +365,16 @@ class ScreenshotAnnotator {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.4);
       z-index: 999998;
       cursor: crosshair;
+      transition: background 0.2s;
     `;
     document.body.appendChild(this.overlay);
   }
 
   createPersistentSelectionBox(selection) {
-    // 创建持久化的选择框，带序号标签
+    // 创建持久化的选择框，带序号标签（微信风格）
     const box = document.createElement('div');
     box.className = 'bst-persistent-selection';
     box.style.cssText = `
@@ -382,37 +383,38 @@ class ScreenshotAnnotator {
       top: ${selection.y}px;
       width: ${selection.width}px;
       height: ${selection.height}px;
-      border: 2px solid #ff6b6b;
+      border: 2px solid #1aad19;
       background: transparent;
       z-index: 999999;
       pointer-events: none;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
     `;
-    
-    // 添加序号标签
+
+    // 添加序号标签（微信绿色）
     const label = document.createElement('div');
     label.className = 'bst-selection-label';
     label.textContent = selection.order;
     label.style.cssText = `
       position: absolute;
-      top: -12px;
-      left: -1px;
-      background: #ff6b6b;
+      top: -14px;
+      left: -2px;
+      background: #1aad19;
       color: white;
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: bold;
       border: 2px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     `;
-    
+
     box.appendChild(label);
     document.body.appendChild(box);
-    
+
     // 保存到元素列表以便后续清理
     this.selectionElements.push(box);
     selection.displayElement = box;
@@ -598,7 +600,7 @@ class ScreenshotAnnotator {
   }
 
   createSelectionBox() {
-    // 使用单个div + CSS outline 实现真正透明的选择框
+    // 使用单个div + CSS outline 实现真正透明的选择框（微信绿色）
     const selectionBox = document.createElement('div');
     selectionBox.className = 'bst-selection-box-outline';
     selectionBox.style.cssText = `
@@ -606,32 +608,72 @@ class ScreenshotAnnotator {
       background: none !important;
       background-color: transparent !important;
       background-image: none !important;
-      outline: 2px solid #ff6b6b !important;
+      outline: 2px solid #1aad19 !important;
       outline-offset: -1px !important;
       border: none !important;
-      box-shadow: none !important;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4) !important;
       pointer-events: none !important;
       z-index: 999999 !important;
       opacity: 1 !important;
     `;
-    
+
     document.body.appendChild(selectionBox);
     this.currentSelection = selectionBox;
+
+    // 创建尺寸指示器
+    this.createSizeIndicator();
+  }
+
+  createSizeIndicator() {
+    if (this.sizeIndicator) {
+      this.sizeIndicator.remove();
+    }
+
+    this.sizeIndicator = document.createElement('div');
+    this.sizeIndicator.className = 'bst-size-indicator';
+    this.sizeIndicator.style.cssText = `
+      position: fixed;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      z-index: 1000000;
+      pointer-events: none;
+      display: none;
+    `;
+
+    document.body.appendChild(this.sizeIndicator);
   }
 
   updateSelectionBox() {
     if (!this.currentSelection || !this.startPoint || !this.endPoint) return;
-    
+
     const left = Math.min(this.startPoint.x, this.endPoint.x);
     const top = Math.min(this.startPoint.y, this.endPoint.y);
     const width = Math.abs(this.endPoint.x - this.startPoint.x);
     const height = Math.abs(this.endPoint.y - this.startPoint.y);
-    
+
     // 更新选择框位置和尺寸
     this.currentSelection.style.left = `${left}px`;
     this.currentSelection.style.top = `${top}px`;
     this.currentSelection.style.width = `${width}px`;
     this.currentSelection.style.height = `${height}px`;
+
+    // 更新尺寸指示器
+    this.updateSizeIndicator(width, height);
+  }
+
+  updateSizeIndicator(width, height) {
+    if (!this.sizeIndicator) return;
+
+    this.sizeIndicator.textContent = `${Math.round(width)} × ${Math.round(height)}`;
+    this.sizeIndicator.style.display = 'block';
+
+    // 位置在鼠标右上方
+    this.sizeIndicator.style.left = `${this.endPoint.x + 10}px`;
+    this.sizeIndicator.style.top = `${this.endPoint.y - 25}px`;
   }
 
   removeSelectionBox(selection) {
@@ -654,6 +696,7 @@ class ScreenshotAnnotator {
     // 创建统一的多框选输入面板
     this.inputPanel = document.createElement('div');
     this.inputPanel.className = 'bst-unified-input-panel';
+    this.inputPanel.style.pointerEvents = 'auto'; // 确保面板可以接收事件
     this.inputPanel.innerHTML = `
       <div class="bst-input-container">
         <div class="bst-input-header">
@@ -718,14 +761,16 @@ class ScreenshotAnnotator {
         left: 50% !important;
         transform: translate(-50%, -50%) !important;
         background: white !important;
-        border-radius: 8px !important;
+        border-radius: 6px !important;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
         z-index: 1000001 !important;
-        min-width: 480px !important;
-        max-width: 600px !important;
-        font-family: Arial, sans-serif !important;
+        min-width: 420px !important;
+        max-width: 500px !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
         font-size: 14px !important;
         line-height: 1.4 !important;
+        pointer-events: auto !important;
+        overflow: hidden !important;
       }
       
       .bst-input-container {
@@ -734,36 +779,39 @@ class ScreenshotAnnotator {
       }
       
       .bst-input-header {
-        padding: 16px 20px !important;
-        border-bottom: 1px solid #e0e0e0 !important;
+        padding: 14px 16px !important;
+        border-bottom: 1px solid #e5e5e5 !important;
         display: flex !important;
         justify-content: space-between !important;
         align-items: center !important;
-        background: #f8f9fa !important;
-        border-radius: 8px 8px 0 0 !important;
+        background: #f7f7f7 !important;
+        border-radius: 6px 6px 0 0 !important;
       }
-      
+
       .bst-input-title {
         margin: 0 !important;
-        font-size: 16px !important;
-        font-weight: bold !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
         color: #333 !important;
       }
-      
+
       .bst-input-close {
         background: none !important;
         border: none !important;
         font-size: 20px !important;
         cursor: pointer !important;
         color: #999 !important;
-        padding: 4px 8px !important;
-        border-radius: 4px !important;
-        width: auto !important;
-        height: auto !important;
+        padding: 0 !important;
+        border-radius: 3px !important;
+        width: 24px !important;
+        height: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
       }
-      
+
       .bst-input-close:hover {
-        background: #f0f0f0 !important;
+        background: #e5e5e5 !important;
         color: #333 !important;
       }
       
@@ -836,23 +884,24 @@ class ScreenshotAnnotator {
       
       .bst-tag {
         padding: 6px 12px !important;
-        border: 1px solid #ddd !important;
+        border: 1px solid #d9d9d9 !important;
         background: white !important;
-        border-radius: 4px !important;
+        border-radius: 3px !important;
         cursor: pointer !important;
-        font-size: 12px !important;
+        font-size: 13px !important;
+        color: #333 !important;
         transition: all 0.2s !important;
       }
-      
+
       .bst-tag:hover {
-        background: #f5f5f5 !important;
-        border-color: #ff6b6b !important;
+        border-color: #1aad19 !important;
+        color: #1aad19 !important;
       }
-      
+
       .bst-tag.active {
-        background: #ff6b6b !important;
+        background: #1aad19 !important;
         color: white !important;
-        border-color: #ff6b6b !important;
+        border-color: #1aad19 !important;
       }
       
       .bst-input-field {
@@ -868,18 +917,21 @@ class ScreenshotAnnotator {
       
       .bst-input-field input {
         width: 100% !important;
-        padding: 10px 12px !important;
-        border: 1px solid #ddd !important;
-        border-radius: 4px !important;
+        padding: 8px 12px !important;
+        border: 1px solid #d9d9d9 !important;
+        border-radius: 3px !important;
         font-size: 14px !important;
         box-sizing: border-box !important;
-        font-family: Arial, sans-serif !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        pointer-events: auto !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        transition: border-color 0.2s !important;
       }
-      
+
       .bst-input-field input:focus {
         outline: none !important;
-        border-color: #ff6b6b !important;
-        box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.1) !important;
+        border-color: #1aad19 !important;
       }
       
       .bst-input-hint {
@@ -889,44 +941,49 @@ class ScreenshotAnnotator {
       }
       
       .bst-input-footer {
-        padding: 16px 20px !important;
-        border-top: 1px solid #e0e0e0 !important;
+        padding: 12px 16px !important;
+        border-top: 1px solid #e5e5e5 !important;
         display: flex !important;
         justify-content: flex-end !important;
-        gap: 10px !important;
-        background: #f8f9fa !important;
-        border-radius: 0 0 8px 8px !important;
+        gap: 8px !important;
+        background: #f7f7f7 !important;
+        border-radius: 0 0 6px 6px !important;
       }
-      
+
       .bst-btn {
-        padding: 8px 16px !important;
-        border: 1px solid #ddd !important;
-        border-radius: 4px !important;
+        padding: 6px 16px !important;
+        border-radius: 3px !important;
         cursor: pointer !important;
-        font-size: 14px !important;
-        font-family: Arial, sans-serif !important;
+        font-size: 13px !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
         transition: all 0.2s !important;
+        border: none !important;
       }
-      
+
       .bst-btn-secondary {
         background: white !important;
         color: #666 !important;
+        border: 1px solid #d9d9d9 !important;
       }
-      
+
       .bst-btn-secondary:hover {
         background: #f5f5f5 !important;
-        border-color: #999 !important;
       }
-      
+
       .bst-btn-primary {
-        background: #ff6b6b !important;
+        background: #1aad19 !important;
         color: white !important;
-        border-color: #ff6b6b !important;
+        border: none !important;
       }
-      
+
       .bst-btn-primary:hover {
-        background: #e55a5a !important;
-        border-color: #e55a5a !important;
+        background: #179b16 !important;
+      }
+
+      .bst-btn-primary:disabled,
+      .bst-btn-secondary:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
       }
     `;
     document.head.appendChild(style);
@@ -1220,24 +1277,24 @@ class ScreenshotAnnotator {
           const width = selection.width * dpr;
           const height = selection.height * dpr;
           
-          // 绘制边框
+          // 绘制边框（微信绿）
           ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = '#ff6b6b';
+          ctx.strokeStyle = '#1aad19';
           ctx.lineWidth = 3 * dpr;
           ctx.strokeRect(x, y, width, height);
-          
+
           // 绘制白色外边框
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
           ctx.lineWidth = 1 * dpr;
           ctx.strokeRect(x - 1 * dpr, y - 1 * dpr, width + 2 * dpr, height + 2 * dpr);
-          
+
           // 绘制序号标签
           const labelSize = 24 * dpr;
           const labelX = x;
           const labelY = y - labelSize / 2;
-          
-          // 标签背景
-          ctx.fillStyle = '#ff6b6b';
+
+          // 标签背景（微信绿）
+          ctx.fillStyle = '#1aad19';
           ctx.beginPath();
           ctx.arc(labelX + labelSize/2, labelY + labelSize/2, labelSize/2, 0, Math.PI * 2);
           ctx.fill();
@@ -1303,8 +1360,8 @@ class ScreenshotAnnotator {
           ctx.lineWidth = 2 * dpr;
           ctx.stroke();
           
-          // 标签文字（醒目的亮黄色）
-          ctx.fillStyle = '#FFD700';
+          // 标签文字（微信绿）
+          ctx.fillStyle = '#1aad19';
           ctx.font = `bold ${18 * dpr}px Arial`;
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
@@ -1367,6 +1424,7 @@ class ScreenshotAnnotator {
     
     this.inputPanel = document.createElement('div');
     this.inputPanel.className = 'bst-input-panel';
+    this.inputPanel.style.pointerEvents = 'auto'; // 确保面板可以接收事件
     this.inputPanel.innerHTML = `
       <div class="bst-input-container">
         <div class="bst-input-header">
@@ -1394,7 +1452,7 @@ class ScreenshotAnnotator {
         </div>
       </div>
     `;
-    
+
     this.addInputPanelStyles();
     this.positionInputPanel();
     document.body.appendChild(this.inputPanel);
@@ -1551,8 +1609,11 @@ class ScreenshotAnnotator {
         border-radius: 4px;
         font-size: 14px;
         box-sizing: border-box;
+        pointer-events: auto !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
       }
-      
+
       .bst-input-field input:focus {
         outline: none;
         border-color: #667eea;
@@ -1868,15 +1929,15 @@ class ScreenshotAnnotator {
         bugData.selections.forEach((sel, index) => {
           const rect = sel.rect;
           
-          // 绘制边框
-          ctx.strokeStyle = '#ff6b6b';
+          // 绘制边框（微信绿）
+          ctx.strokeStyle = '#1aad19';
           ctx.lineWidth = 2 * dpr;
           ctx.strokeRect(rect.x * dpr, rect.y * dpr, rect.width * dpr, rect.height * dpr);
-          
+
           const labelY = rect.y * dpr - 10;
           const labelX = rect.x * dpr;
-          
-          ctx.fillStyle = '#ff6b6b';
+
+          ctx.fillStyle = '#1aad19';
           // 使用bugNumber作为标签，相同BUG显示相同编号
           const labelText = `#${sel.bugNumber || 1}`;
           ctx.font = `bold ${12 * dpr}px Arial`;
@@ -1900,7 +1961,7 @@ class ScreenshotAnnotator {
             descY = rect.y * dpr + rect.height * dpr + 25 * dpr;
           }
           
-          ctx.fillStyle = 'rgba(255, 107, 107, 0.95)';
+          ctx.fillStyle = 'rgba(26, 173, 25, 0.95)';
           const padding = 8 * dpr;
           ctx.fillRect(descX - padding/2, descY - 18 * dpr, descWidth + padding, 24 * dpr);
           
@@ -2198,28 +2259,34 @@ class ScreenshotAnnotator {
     toast.style.cssText = `
       position: fixed;
       top: 20px;
-      right: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 12px 20px;
       border-radius: 4px;
       color: white;
       font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       z-index: 1000002;
-      animation: slideIn 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     `;
-    
+
     if (type === 'success') {
-      toast.style.background = '#52c41a';
+      toast.style.background = '#1aad19';
     } else if (type === 'error') {
-      toast.style.background = '#f5222d';
+      toast.style.background = '#fa5151';
+    } else if (type === 'warning') {
+      toast.style.background = '#ff976a';
     } else {
-      toast.style.background = '#1890ff';
+      toast.style.background = '#10aeff';
     }
-    
+
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
-      toast.remove();
-    }, 3000);
+      toast.style.transition = 'opacity 0.3s';
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
   }
 
   cancel() {
@@ -2302,21 +2369,22 @@ class ScreenshotAnnotator {
     
     // 9. 强制清理所有可能的BST相关元素
     const selectors = [
-      '.bst-selection-label', 
-      '.bst-saved-selection-outline', 
-      '.bst-selection-box-outline', 
-      '.bst-selection-border-top', 
-      '.bst-selection-border-right', 
-      '.bst-selection-border-bottom', 
-      '.bst-selection-border-left', 
+      '.bst-selection-label',
+      '.bst-saved-selection-outline',
+      '.bst-selection-box-outline',
+      '.bst-selection-border-top',
+      '.bst-selection-border-right',
+      '.bst-selection-border-bottom',
+      '.bst-selection-border-left',
       '.bst-persistent-selection',
-      '.bst-tooltip', 
-      '.bst-status-indicator', 
+      '.bst-tooltip',
+      '.bst-status-indicator',
       '.bst-selection-hint',
       '.bst-unified-input-panel',
       '.bst-input-panel',
       '.bst-overlay',
-      '.bst-frozen-background'
+      '.bst-frozen-background',
+      '.bst-size-indicator'
     ];
     
     let removedCount = 0;
