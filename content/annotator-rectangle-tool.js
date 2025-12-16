@@ -350,33 +350,23 @@ class RectangleAnnotator {
   calculateToolbarPosition(selectionRect) {
     const toolbarWidth = 200; // 预估工具栏宽度
     const toolbarHeight = 40; // 预估工具栏高度
-    const padding = 12;
+    const padding = 16;
 
-    let left = selectionRect.left;
-    let top = selectionRect.top - toolbarHeight - padding;
+    // 永久放到底部中间，避免覆盖表单/登录按钮等关键区域
+    let left = (window.innerWidth - toolbarWidth) / 2;
+    let top = window.innerHeight - toolbarHeight - padding;
 
-    // 策略 1: 尝试放在选区上方
-    if (top < padding) {
-      // 上方空间不足，尝试下方
-      top = selectionRect.bottom + padding;
-    }
-
-    // 策略 2: 如果下方也不足（选区太大），固定在屏幕顶部
-    if (top + toolbarHeight > window.innerHeight - padding) {
-      top = padding;
-    }
-
-    // 策略 3: 水平居中对齐选区，但不超出屏幕
-    left = selectionRect.left + (selectionRect.width - toolbarWidth) / 2;
-
-    // 确保不超出左边界
+    // 左右边界兜底
     if (left < padding) {
       left = padding;
     }
-
-    // 确保不超出右边界
     if (left + toolbarWidth > window.innerWidth - padding) {
       left = window.innerWidth - toolbarWidth - padding;
+    }
+
+    // 视口过矮时的兜底
+    if (top < padding) {
+      top = padding;
     }
 
     return { left, top };
@@ -468,7 +458,11 @@ class RectangleAnnotator {
     this.currentRect.className = 'bst-temp-rect';
     this.currentRect.style.cssText = `
       position: fixed;
-      border: 2px solid #1aad19;
+      border: 3px solid #12c2e9;
+      box-shadow:
+        0 0 0 2px rgba(18, 194, 233, 0.3),
+        0 0 12px rgba(18, 194, 233, 0.55);
+      outline: 2px solid rgba(26, 173, 25, 0.6);
       background: transparent;
       z-index: 2147483643;
       pointer-events: none;
@@ -635,7 +629,11 @@ class RectangleAnnotator {
       top: ${rectData.y}px;
       width: ${rectData.width}px;
       height: ${rectData.height}px;
-      border: 2px solid #1aad19;
+      border: 3px solid #12c2e9;
+      box-shadow:
+        0 0 0 2px rgba(18, 194, 233, 0.35),
+        0 0 14px rgba(18, 194, 233, 0.6);
+      outline: 2px solid rgba(26, 173, 25, 0.65);
       background: transparent;
       z-index: 2147483643;
       pointer-events: none;
