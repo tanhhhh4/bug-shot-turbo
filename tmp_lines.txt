@@ -1,0 +1,8 @@
+833:'  async saveConfig() {'
+834:'    try {'
+835:'      // 显示加载状态'
+836:"      const saveBtn = document.getElementById('saveOptions');"
+837:'      const originalText = saveBtn.innerHTML;'
+838:'      saveBtn.innerHTML = \'<span class="loading"></span> 保存中...\';'
+839:'      saveBtn.disabled = true;'
+840:'      '

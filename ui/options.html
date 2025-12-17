@@ -22,12 +22,15 @@
     </header>
     
     <nav class="options-nav">
-      <button class="nav-tab active" data-section="tapd">📋 TAPD配置</button>
-      <button class="nav-tab" data-section="templates">📝 模板设置</button>
-      <button class="nav-tab" data-section="tags">🏷️ 标签管理</button>
-      <button class="nav-tab" data-section="shortcuts">⌨️ 快捷键</button>
-      <button class="nav-tab" data-section="data">💾 数据管理</button>
+      <button class="nav-tab active" data-section="tapd">TAPD配置</button>
+      <button class="nav-tab" data-section="templates">模板设置</button>
+      <button class="nav-tab" data-section="tags">标签管理</button>
+      <button class="nav-tab" data-section="dropdowns">下拉配置</button>
+      <button class="nav-tab" data-section="ai">AI下拉匹配</button>
+      <button class="nav-tab" data-section="shortcuts">快捷键</button>
+      <button class="nav-tab" data-section="data">数据管理</button>
     </nav>
+
     
     <main class="options-content">
       <section class="option-section active" id="tapd-section">
@@ -68,8 +71,62 @@
           <small>iframe内部可编辑区域的CSS选择器</small>
         </div>
       </section>
+
       
-      <section class="option-section" id="templates-section">
+      <section class="option-section" id="dropdowns-section">
+        <div class="section-header">
+          <h2>下拉配置</h2>
+          <p class="section-desc">为 TAPD 下拉字段配置选择器和关键词映射，自动匹配你的描述</p>
+        </div>
+        <div class="dropdown-toolbar">
+          <button id="addDropdownBtn" class="btn btn-primary btn-sm"><span class="icon">+</span> 新增下拉</button>
+          <div class="hint">支持原生 select、Antd/Element 自定义下拉；未匹配或未定位会自动跳过</div>
+        </div>
+        <div id="dropdownList" class="dropdown-list"></div>
+        <div class="option-help">
+          <ul>
+            <li>名称：方便识别该下拉，例如“问题类型”“所属模块”。</li>
+            <li>类型：native/antd/element/custom。</li>
+            <li>选择器：CSS 或 XPath，先用 CSS，不行再 XPath。</li>
+            <li>可选：展开选择器（open selector）/选项选择器（options selector），自定义下拉时使用。</li>
+            <li>映射：值 + 关键词，描述包含任意关键词就选中该值；无匹配则跳过。</li>
+          </ul>
+        </div>
+      </section>
+      <section class="option-section" id="ai-section">
+        <div class="section-header">
+          <h2>AI 下拉匹配</h2>
+          <p class="section-desc">启用后，AI 会基于标注文字在候选值中自动选择下拉项</p>
+        </div>
+        <div class="option-group">
+          <label>
+            <input type="checkbox" id="aiEnable">
+            启用 AI 下拉匹配
+          </label>
+        </div>
+        <div class="option-group">
+          <label for="aiEndpoint">API Endpoint</label>
+          <input type="text" id="aiEndpoint" placeholder="https://api.example.com/v1/chat/completions">
+        </div>
+        <div class="option-group">
+          <label for="aiKey">API Key</label>
+          <input type="password" id="aiKey" placeholder="sk-xxx">
+        </div>
+        <div class="option-group">
+          <label for="aiModel">模型</label>
+          <input type="text" id="aiModel" placeholder="gpt-3.5-turbo">
+        </div>
+        <div class="option-group">
+          <label for="aiTimeout">超时 (毫秒)</label>
+          <input type="number" id="aiTimeout" min="1000" max="20000" step="500" value="5000">
+          <small>超时或失败会回退到本地默认逻辑</small>
+        </div>
+        <div class="option-group">
+          <button id="aiTestBtn" class="btn btn-secondary">测试 AI 连通性</button>
+          <small id="aiTestStatus"></small>
+        </div>
+      </section>
+<section class="option-section" id="templates-section">
         <div class="section-header">
           <h2>📝 模板配置</h2>
           <p class="section-desc">自定义Bug标题和描述模板</p>

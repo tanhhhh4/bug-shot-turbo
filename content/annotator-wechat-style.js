@@ -529,19 +529,28 @@ class WeChatStyleAnnotator {
 
           // 绘制标注文字
           const text = `[${this.currentBug.tag}] ${this.currentBug.issue}`;
-          ctx.font = `${14 * dpr}px Arial`;
-          const textWidth = ctx.measureText(text).width;
+          const fontSize = 18 * dpr;
+          const paddingX = 12 * dpr;
+          const paddingY = 8 * dpr;
+
+          ctx.font = `${fontSize}px "Segoe UI", Arial, sans-serif`;
+          ctx.textBaseline = 'top';
+
+          const textMetrics = ctx.measureText(text);
+          const labelWidth = textMetrics.width + paddingX * 2;
+          const labelHeight = fontSize + paddingY * 2;
 
           const labelX = sel.x * dpr;
-          const labelY = sel.y * dpr - 10;
+          const idealLabelY = sel.y * dpr - (labelHeight + 10 * dpr);
+          const labelY = Math.max(8 * dpr, idealLabelY);
 
           // 文字背景
           ctx.fillStyle = 'rgba(26, 173, 25, 0.9)';
-          ctx.fillRect(labelX, labelY - 22 * dpr, textWidth + 16 * dpr, 28 * dpr);
+          ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
 
           // 文字
           ctx.fillStyle = 'white';
-          ctx.fillText(text, labelX + 8 * dpr, labelY - 5 * dpr);
+          ctx.fillText(text, labelX + paddingX, labelY + paddingY);
         });
 
         this.currentBug.screenshot = canvas.toDataURL('image/png');

@@ -6,6 +6,7 @@ class TapdAutoFiller {
     this.bugData = null;
     this.retryCount = 0;
     this.maxRetries = 10;
+    this.dropdownConfigs = [];
     
     this.init();
   }
@@ -43,7 +44,7 @@ class TapdAutoFiller {
 
   async loadConfig() {
     try {
-      const result = await chrome.storage.local.get(['config']);
+      const result = await chrome.storage.local.get(['config', 'dropdownConfigs']);
       this.config = result.config || {
         tapd: {
           projectIds: ["47910877"],
@@ -58,8 +59,11 @@ class TapdAutoFiller {
         templates: {
           title: "${rectangleList}（${pathLast1}）",
           description: "【问题类型】${firstTag}\n\n【详细说明】\n${rectangleList}\n\n【页面地址】${pageURL}\n【发现时间】${timestamp}\n【附件截图】粘贴后见下方（Ctrl/Cmd+V）"
-        }
+        },
+        dropdowns: []
       };
+
+      this.dropdownConfigs = result.dropdownConfigs || this.config.dropdowns || [];
     } catch (error) {
       console.error('Failed to load config:', error);
     }
@@ -182,6 +186,9 @@ class TapdAutoFiller {
       
       // 填充描述
       const descFilled = await this.fillDescription(description);
+
+      // 根据描述尝试自动匹配下拉
+      await this.autoSelectDropdowns(description);
       
       if (titleFilled && descFilled) {
         // 显示成功提示
@@ -395,6 +402,298 @@ class TapdAutoFiller {
     } catch (error) {
       console.error('Fill description error:', error);
       return false;
+    }
+  }
+
+  // ========== Dropdown auto-selection ========== 
+
+  normalizeText(text = '') {
+    return text.toLowerCase().replace(/\s+/g, '').replace(/[^\w\u4e00-\u9fa5]/g, '');
+  }
+
+  delay(ms = 100) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async autoSelectDropdowns(description) {
+    const configs = this.dropdownConfigs || [];
+    if (!configs.length) return;
+
+    // 合并可用文本：只取矩形文本+标签，避免额外敏感数据
+    let combinedText = description || '';
+    const rectTexts = Array.isArray(this.bugData?.rectangles)
+      ? this.bugData.rectangles.map(r => `${r.order}.${r.text || ''}`).join(' ')
+      : '';
+    const tagText = this.bugData?.tag || '';
+    combinedText = `${rectTexts} ${tagText}`.trim();
+    const normalizedDesc = this.normalizeText(combinedText);
+
+    // AI 预选
+    this.aiDropdownSuggestions = await this.fetchAiDropdownSuggestions(configs, rectTexts, tagText).catch(() => ({})) || {};
+
+    for (const cfg of configs) {
+      try {
+        const aiValue = this.aiDropdownSuggestions?.[cfg.name];
+        await this.autoSelectOneDropdown(cfg, normalizedDesc, aiValue);
+      } catch (e) {
+        console.log('BST TAPD Filler: dropdown auto-select error', cfg?.name || '', e);
+      }
+    }
+  }
+
+  async autoSelectOneDropdown(cfg, normalizedDesc, aiValue) {
+    if (!cfg || !cfg.selectors) return;
+
+    const element = this.findElementBySelectors(cfg.selectors);
+    const type = cfg.type || (element && element.tagName === 'SELECT' ? 'native' : 'custom');
+
+    const mappingHit = this.matchByMapping(normalizedDesc, cfg.mapping);
+    const manualValue = aiValue || this.bugData?.dropdownValue?.trim();
+
+    if (type === 'native' && element && element.tagName === 'SELECT') {
+      const options = this.collectNativeOptions(element);
+      const targetOption = this.pickOption(options, normalizedDesc, mappingHit, manualValue);
+      if (!targetOption) {
+        console.log('BST TAPD Filler: no match for dropdown', cfg.name, { aiValue, mappingHit, candidates: cfg.candidates });
+        return;
+      }
+      console.log('BST TAPD Filler: select native', { name: cfg.name, value: targetOption.value, aiValue, mappingHit });
+      this.applyNativeSelection(element, targetOption);
+      return;
+    }
+
+    // Custom dropdown: click to open then click the matched option
+    await this.openDropdown(element, cfg);
+
+    const options = await this.collectCustomOptions(cfg);
+    if (!options.length) return;
+
+    const targetOption = this.pickOption(options, normalizedDesc, mappingHit, manualValue);
+    if (!targetOption || !targetOption.el) return;
+
+    targetOption.el.click();
+  }
+
+  async fetchAiDropdownSuggestions(configs, rectTexts, tagText) {
+    const ai = this.config?.ai;
+    if (!ai?.enable || !ai.endpoint || !ai.apiKey || !ai.model) {
+      console.log('BST TAPD Filler: AI disabled or config missing');
+      return {};
+    }
+
+    const dropdownBlocks = configs.map(cfg => {
+      const candidates = Array.isArray(cfg.candidates) && cfg.candidates.length
+        ? cfg.candidates
+        : Object.keys(cfg.mapping || {});
+      return {
+        name: cfg.name || '下拉',
+        candidates
+      };
+    });
+
+    const prompt = [
+      '你是一个只选择下拉值的助手。',
+      '规则：',
+      '1. 每个下拉只能从提供的候选中选 1 个；',
+      '2. 返回 JSON，键是下拉名称，值是候选中的一个；',
+      '3. 不要输出多余文字。',
+      '',
+      '候选列表：',
+      ...dropdownBlocks.map(d => `- ${d.name}: [${d.candidates.join(', ')}]`),
+      '',
+      '上下文：',
+      `矩形文本：${rectTexts || '（空）'}`,
+      `标签：${tagText || '（空）'}`,
+      '',
+      '示例返回：{"严重程度":"normal","优先级":"P1"}'
+    ].join('\n');
+
+    console.log('BST TAPD Filler: AI request payload', {
+      endpoint: ai.endpoint,
+      model: ai.model,
+      dropdowns: dropdownBlocks,
+      rectTexts,
+      tagText
+    });
+
+    const controller = new AbortController();
+    const timeoutMs = ai.timeoutMs || 5000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(ai.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ai.apiKey}`
+        },
+        body: JSON.stringify({
+          model: ai.model,
+          messages: [
+            { role: 'system', content: '你只返回 JSON，键为下拉名称，值为候选中的一个。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      const data = await res.json();
+      console.log('BST TAPD Filler: AI response raw', data);
+
+      const content = data?.choices?.[0]?.message?.content || '';
+      let parsed = {};
+      try {
+        // 去掉可能的 ```json 包裹
+        const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        console.log('BST TAPD Filler: AI response not JSON, content=', content);
+        return {};
+      }
+
+      console.log('BST TAPD Filler: AI parsed suggestions', parsed);
+      return parsed;
+    } catch (error) {
+      clearTimeout(timer);
+      console.log('BST TAPD Filler: AI request failed', { error: error?.message, timeoutMs });
+      return {};
+    }
+  }
+
+  findElementBySelectors(selectors = []) {
+    for (const sel of selectors) {
+      if (sel.css) {
+        const el = document.querySelector(sel.css);
+        if (el) return el;
+      }
+      if (sel.xpath) {
+        const el = this.evaluateXPath(sel.xpath);
+        if (el) return el;
+      }
+    }
+    return null;
+  }
+
+  evaluateXPath(xpath) {
+    try {
+      const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+      return result.singleNodeValue;
+    } catch (e) {
+      console.log('BST TAPD Filler: XPath error', xpath, e);
+      return null;
+    }
+  }
+
+  matchByMapping(normalizedDesc, mapping = {}) {
+    if (!mapping) return null;
+    for (const [value, keywords] of Object.entries(mapping)) {
+      if (!Array.isArray(keywords)) continue;
+      if (keywords.some(k => normalizedDesc.includes(this.normalizeText(k)))) {
+        return { target: value, source: 'mapping' };
+      }
+    }
+    return null;
+  }
+
+  collectNativeOptions(selectEl) {
+    return Array.from(selectEl.options).map(opt => ({
+      value: opt.value,
+      text: opt.textContent?.trim() || '',
+      normalizedText: this.normalizeText(opt.textContent || ''),
+      el: opt
+    }));
+  }
+
+  async collectCustomOptions(cfg) {
+    const selector = cfg.optionsSelector || '.ant-select-dropdown .ant-select-item-option, .el-select-dropdown__item';
+    let attempts = 0;
+    while (attempts < 3) {
+      const nodes = Array.from(document.querySelectorAll(selector));
+      if (nodes.length) {
+        return nodes.map(node => ({
+          value: node.getAttribute('data-value') || node.getAttribute('value') || node.textContent?.trim() || '',
+          text: node.textContent?.trim() || '',
+          normalizedText: this.normalizeText(node.textContent || ''),
+          el: node
+        }));
+      }
+      attempts += 1;
+      await this.delay(cfg.retryDelay || 120);
+    }
+    return [];
+  }
+
+  pickOption(options, normalizedDesc, mappingHit, manualValue) {
+    if (!options || !options.length) return null;
+
+    // 0) 用户手填值优先
+    if (manualValue) {
+      const manualNorm = this.normalizeText(manualValue);
+      const byValue = options.find(o => o.value === manualValue);
+      if (byValue) return byValue;
+      const byText = options.find(o => o.normalizedText === manualNorm);
+      if (byText) return byText;
+      const byValueNorm = options.find(o => this.normalizeText(o.value) === manualNorm);
+      if (byValueNorm) return byValueNorm;
+    }
+
+    // 1) mapping value first
+    if (mappingHit?.target) {
+      const byValue = options.find(o => o.value === mappingHit.target);
+      if (byValue) return byValue;
+      const byText = options.find(o => o.normalizedText === this.normalizeText(mappingHit.target));
+      if (byText) return byText;
+    }
+
+    // 2) description contains option text
+    const byDesc = options.find(o => o.normalizedText && normalizedDesc.includes(o.normalizedText));
+    if (byDesc) return byDesc;
+
+    // 3) description contains option value
+    const byValueInDesc = options.find(o => o.value && normalizedDesc.includes(this.normalizeText(o.value)));
+    if (byValueInDesc) return byValueInDesc;
+
+    return null;
+  }
+
+  applyNativeSelection(selectEl, option) {
+    try {
+      selectEl.value = option.value;
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) {
+      console.log('BST TAPD Filler: apply native selection failed', e);
+    }
+  }
+
+  async openDropdown(element, cfg) {
+    // click trigger if available
+    if (element) {
+      element.click();
+    }
+
+    // if a specific opener is provided
+    if (cfg.openSelector) {
+      const opener = element?.querySelector?.(cfg.openSelector) || document.querySelector(cfg.openSelector);
+      opener?.click();
+    }
+
+    // optional box coordinate fallback
+    if (cfg.box) {
+      this.clickBox(cfg.box);
+    }
+
+    await this.delay(cfg.openDelay || 120);
+  }
+
+  clickBox(box) {
+    if (!box) return;
+    const centerX = box.x + (box.width || 0) / 2;
+    const centerY = box.y + (box.height || 0) / 2;
+    const target = document.elementFromPoint(centerX, centerY);
+    if (target) {
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: centerX, clientY: centerY }));
     }
   }
 

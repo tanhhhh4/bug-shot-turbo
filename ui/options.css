@@ -228,6 +228,7 @@ body {
 }
 
 .option-group input[type="text"],
+.option-group input[type="password"],
 .option-group input[type="number"],
 .option-group textarea,
 .option-group select {
@@ -897,4 +898,136 @@ body {
   .modal-content {
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8);
   }
+}
+
+/* Dropdown config */
+.dropdown-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.dropdown-toolbar .hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.dropdown-list {
+  display: grid;
+  gap: 14px;
+}
+
+.dropdown-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+}
+
+.dropdown-card .card-row {
+  margin-bottom: 10px;
+}
+
+.dropdown-card .card-row.header {
+  display: grid;
+  grid-template-columns: 1fr 150px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.dropdown-card .card-row.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.dropdown-card label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.dropdown-card input,
+.dropdown-card select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  background: var(--bg-secondary);
+}
+
+.dropdown-card input:focus,
+.dropdown-card select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.dropdown-card .btn-text {
+  background: transparent;
+  color: #fa5252;
+  border: none;
+  cursor: pointer;
+}
+
+.mapping-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mapping-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.mapping-row input {
+  width: 100%;
+}
+
+.dropdown-candidates {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: Consolas, Menlo, monospace;
+  resize: vertical;
+}
+
+.mapping-row.error input {
+  border-color: var(--danger-color);
+  background: #fff5f5;
+}
+
+.mapping-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mapping-list .remove-mapping {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  cursor: pointer;
+}
+
+.row-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.empty-state {
+  padding: 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
 }

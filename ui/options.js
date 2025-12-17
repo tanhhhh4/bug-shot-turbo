@@ -6,6 +6,7 @@ class OptionsManager {
     this.currentEditingTag = null;
     this.selectedTags = new Set();
     this.searchTimeout = null;
+    this.dropdownListBound = false;
     this.init();
   }
 
@@ -39,6 +40,12 @@ class OptionsManager {
     try {
       const result = await chrome.storage.local.get(['config']);
       this.config = result.config || this.getDefaultConfig();
+      if (!Array.isArray(this.config.dropdowns)) {
+        this.config.dropdowns = [];
+      }
+      if (!this.config.ai) {
+        this.config.ai = this.getDefaultConfig().ai;
+      }
     } catch (error) {
       console.error('Load config error:', error);
       this.config = this.getDefaultConfig();
@@ -60,6 +67,14 @@ class OptionsManager {
         title: "${issue}（${pathLast1}）",
         description: "【问题】${firstTag} - ${issue}\n【页面】${pageURL}\n【时间】${timestamp}\n【期望】<在此补充>\n【实际】<在此补充>\n（截图：粘贴后见下）"
       },
+      ai: {
+        enable: false,
+        endpoint: '',
+        apiKey: '',
+        model: '',
+        timeoutMs: 5000
+      },
+      dropdowns: [],
       tags: ["按钮失效", "表单校验", "样式错位", "接口报错", "其他"]
     };
   }
@@ -70,6 +85,15 @@ class OptionsManager {
     
     // 显示标签管理
     this.displayTagsManagement();
+
+    // 显示AI配置
+    this.displayAiConfig();
+
+    // 绑定 AI 测试
+    const aiTestBtn = document.getElementById('aiTestBtn');
+    if (aiTestBtn) {
+      aiTestBtn.addEventListener('click', () => this.testAiConnectivity());
+    }
   }
 
   displayTapdConfig() {
@@ -80,6 +104,18 @@ class OptionsManager {
     document.getElementById('descBodySelector').value = this.config.selectors.descBody;
     document.getElementById('titleTemplate').value = this.config.templates.title;
     document.getElementById('descTemplate').value = this.config.templates.description;
+    this.renderDropdowns();
+  }
+
+  displayAiConfig() {
+    const ai = this.config.ai || {};
+    const enableEl = document.getElementById('aiEnable');
+    if (!enableEl) return;
+    enableEl.checked = !!ai.enable;
+    document.getElementById('aiEndpoint').value = ai.endpoint || '';
+    document.getElementById('aiKey').value = ai.apiKey || '';
+    document.getElementById('aiModel').value = ai.model || '';
+    document.getElementById('aiTimeout').value = ai.timeoutMs || 5000;
   }
 
   async displayTagsManagement() {
@@ -176,6 +212,263 @@ class OptionsManager {
     }).join('');
   }
 
+  // ===== 下拉配置渲染与采集 =====
+
+  renderDropdowns() {
+    const list = document.getElementById('dropdownList');
+    if (!list) return;
+
+    const data = Array.isArray(this.config.dropdowns) ? this.config.dropdowns : [];
+    if (!data.length) {
+      list.innerHTML = '<div class="empty-state">暂无下拉配置，点击“新增下拉”开始配置</div>';
+      return;
+    }
+
+    list.innerHTML = data.map((item, index) => this.buildDropdownCard(item, index)).join('');
+  }
+
+  buildDropdownCard(item = {}, index = 0) {
+    const selectors = item.selectors || [];
+    const css = selectors.find(s => s.css)?.css || '';
+    const xpath = selectors.find(s => s.xpath)?.xpath || '';
+    const candidatesText = Array.isArray(item.candidates) && item.candidates.length
+      ? item.candidates.join('\n')
+      : Object.keys(item.mapping || {}).join('\n');
+    const type = item.type || 'native';
+
+    return `
+      <div class="dropdown-card" data-index="${index}">
+        <div class="card-row header">
+          <input type="text" class="dropdown-name" placeholder="下拉名称，如 问题类型" value="${this.escapeHTML(item.name || '')}">
+          <select class="dropdown-type">
+            <option value="native" ${type === 'native' ? 'selected' : ''}>native</option>
+            <option value="antd" ${type === 'antd' ? 'selected' : ''}>antd</option>
+            <option value="element" ${type === 'element' ? 'selected' : ''}>element</option>
+            <option value="custom" ${type === 'custom' ? 'selected' : ''}>custom</option>
+          </select>
+          <button class="btn-text dropdown-remove">删除</button>
+        </div>
+        <div class="card-row">
+          <label>CSS 选择器</label>
+          <input type="text" class="dropdown-css" placeholder="#module-select" value="${this.escapeHTML(css)}">
+        </div>
+        <div class="card-row">
+          <label>XPath 选择器（可选）</label>
+          <input type="text" class="dropdown-xpath" placeholder="//label[contains(.,\"所属模块\")]/following::select[1]" value="${this.escapeHTML(xpath)}">
+        </div>
+        <div class="card-row split">
+          <div>
+            <label>展开选择器（可选）</label>
+            <input type="text" class="dropdown-open-selector" placeholder=".ant-select-selector" value="${this.escapeHTML(item.openSelector || '')}">
+          </div>
+          <div>
+            <label>选项选择器（可选）</label>
+            <input type="text" class="dropdown-options-selector" placeholder=".ant-select-dropdown .ant-select-item-option" value="${this.escapeHTML(item.optionsSelector || '')}">
+          </div>
+        </div>
+        <div class="card-row mappings">
+          <div class="row-title">候选值（每行一个，AI 只从这些候选里选择）</div>
+          <textarea class="dropdown-candidates" rows="4" placeholder="如：&#10;fatal&#10;serious&#10;normal&#10;prompt&#10;advice">${this.escapeHTML(candidatesText)}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  mappingEntries(mappingObj = {}) {
+    if (!mappingObj || typeof mappingObj !== 'object') return [];
+    return Object.entries(mappingObj).map(([value, keywords]) => ({
+      value,
+      keywords: Array.isArray(keywords) ? keywords.join(', ') : ''
+    }));
+  }
+
+  bindDropdownListEvents() {
+    if (this.dropdownListBound) return;
+    const list = document.getElementById('dropdownList');
+    if (!list) return;
+
+    list.addEventListener('click', (e) => {
+      const card = e.target.closest('.dropdown-card');
+      if (!card) return;
+      const index = parseInt(card.dataset.index, 10);
+
+      if (e.target.classList.contains('dropdown-remove')) {
+        this.removeDropdown(index);
+      }
+
+      if (e.target.classList.contains('add-mapping')) {
+        this.addMappingRow(index);
+      }
+
+      if (e.target.classList.contains('remove-mapping')) {
+        const mapIndex = parseInt(e.target.closest('.mapping-row')?.dataset.mapIndex || '-1', 10);
+        this.removeMappingRow(index, mapIndex);
+      }
+    });
+
+    this.dropdownListBound = true;
+  }
+
+  addDropdownCard() {
+    // 先同步当前表单，再新增
+    this.config.dropdowns = this.collectDropdownsFromDom();
+    this.config.dropdowns.push({
+      name: '',
+      type: 'native',
+      selectors: [{ css: '' }],
+      mapping: {}
+    });
+    this.renderDropdowns();
+  }
+
+  removeDropdown(index) {
+    this.config.dropdowns = this.collectDropdownsFromDom();
+    this.config.dropdowns.splice(index, 1);
+    this.renderDropdowns();
+  }
+
+  addMappingRow(dropdownIndex) {
+    this.config.dropdowns = this.collectDropdownsFromDom();
+    const target = this.config.dropdowns[dropdownIndex];
+    if (!target.mapping) target.mapping = {};
+    target.mapping[''] = [];
+    this.renderDropdowns();
+  }
+
+  removeMappingRow(dropdownIndex, mapIndex) {
+    this.config.dropdowns = this.collectDropdownsFromDom();
+    const target = this.config.dropdowns[dropdownIndex];
+    const entries = this.mappingEntries(target.mapping);
+    if (entries[mapIndex]) {
+      delete target.mapping[entries[mapIndex].value];
+    }
+    this.renderDropdowns();
+  }
+
+  collectDropdownsFromDom() {
+    const cards = Array.from(document.querySelectorAll('.dropdown-card'));
+    const dropdowns = [];
+
+    cards.forEach(card => {
+      const name = card.querySelector('.dropdown-name')?.value?.trim() || '';
+      const type = card.querySelector('.dropdown-type')?.value || 'native';
+      const css = card.querySelector('.dropdown-css')?.value?.trim() || '';
+      const xpath = card.querySelector('.dropdown-xpath')?.value?.trim() || '';
+      const openSelector = card.querySelector('.dropdown-open-selector')?.value?.trim() || '';
+      const optionsSelector = card.querySelector('.dropdown-options-selector')?.value?.trim() || '';
+      const candidatesRaw = card.querySelector('.dropdown-candidates')?.value || '';
+
+      const selectors = [];
+      if (css) selectors.push({ css });
+      if (xpath) selectors.push({ xpath });
+
+      const candidates = candidatesRaw.split(/\n|[,，]/).map(s => s.trim()).filter(Boolean);
+
+      if (!name && selectors.length === 0) {
+        return; // 跳过空卡
+      }
+
+      const item = {
+        name,
+        type,
+        selectors,
+        candidates
+      };
+      if (openSelector) item.openSelector = openSelector;
+      if (optionsSelector) item.optionsSelector = optionsSelector;
+
+      dropdowns.push(item);
+    });
+
+    return dropdowns;
+  }
+
+  validateDropdownMappings() {
+    const cards = Array.from(document.querySelectorAll('.dropdown-card'));
+    let hasError = false;
+    const messages = [];
+
+    cards.forEach((card, cardIndex) => {
+      const dropdownName = card.querySelector('.dropdown-name')?.value?.trim() || `Dropdown ${cardIndex + 1}`;
+      const candidatesRaw = card.querySelector('.dropdown-candidates')?.value || '';
+      const candidates = candidatesRaw.split(/\n|[,，]/).map(s => s.trim()).filter(Boolean);
+      if (!candidates.length) {
+        hasError = true;
+        messages.push(`${dropdownName} 缺少候选值`);
+      }
+    });
+
+    if (hasError) {
+      this.showStatus(messages.join('；'), 'error');
+      const firstError = document.querySelector('.dropdown-candidates');
+      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    return true;
+  }
+
+  async testAiConnectivity() {
+    const statusEl = document.getElementById('aiTestStatus');
+    const endpoint = document.getElementById('aiEndpoint')?.value?.trim();
+    const apiKey = document.getElementById('aiKey')?.value?.trim();
+    const model = document.getElementById('aiModel')?.value?.trim() || 'gpt-3.5-turbo';
+    const timeoutMs = parseInt(document.getElementById('aiTimeout')?.value || '5000', 10) || 5000;
+
+    if (!endpoint || !apiKey) {
+      statusEl.textContent = '请先填写 Endpoint 和 API Key';
+      statusEl.style.color = '#e53e3e';
+      return;
+    }
+
+    statusEl.textContent = '测试中...';
+    statusEl.style.color = '#718096';
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: 'test' },
+            { role: 'user', content: 'ping' }
+          ],
+          max_tokens: 5,
+          temperature: 0
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+
+      statusEl.textContent = '连通成功';
+      statusEl.style.color = '#38a169';
+    } catch (error) {
+      clearTimeout(timer);
+      statusEl.textContent = `失败: ${error.message}`;
+      statusEl.style.color = '#e53e3e';
+    }
+  }
+
+  escapeHTML(str = '') {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   formatDate(timestamp) {
     return new Date(timestamp).toLocaleDateString('zh-CN', { 
       month: 'short', 
@@ -224,6 +517,13 @@ class OptionsManager {
     document.getElementById('clearHistory').addEventListener('click', () => {
       this.clearHistory();
     });
+
+    // 下拉配置
+    const addDropdownBtn = document.getElementById('addDropdownBtn');
+    if (addDropdownBtn) {
+      addDropdownBtn.addEventListener('click', () => this.addDropdownCard());
+    }
+    this.bindDropdownListEvents();
 
     // 文件导入
     document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -594,6 +894,9 @@ class OptionsManager {
       // 显示加载状态
       const saveBtn = document.getElementById('saveOptions');
       const originalText = saveBtn.innerHTML;
+      if (!this.validateDropdownMappings()) {
+        return;
+      }
       saveBtn.innerHTML = '<span class="loading"></span> 保存中...';
       saveBtn.disabled = true;
       
@@ -610,10 +913,18 @@ class OptionsManager {
         templates: {
           title: document.getElementById('titleTemplate').value,
           description: document.getElementById('descTemplate').value
-        }
+        },
+        ai: {
+          enable: document.getElementById('aiEnable')?.checked || false,
+          endpoint: document.getElementById('aiEndpoint')?.value || '',
+          apiKey: document.getElementById('aiKey')?.value || '',
+          model: document.getElementById('aiModel')?.value || '',
+          timeoutMs: parseInt(document.getElementById('aiTimeout')?.value || '5000', 10) || 5000
+        },
+        dropdowns: this.collectDropdownsFromDom()
       };
 
-      await chrome.storage.local.set({ config: newConfig });
+      await chrome.storage.local.set({ config: newConfig, dropdownConfigs: newConfig.dropdowns });
       this.config = newConfig;
       
       // 恢复按钮状态
