@@ -7,6 +7,7 @@ class TapdAutoFiller {
     this.retryCount = 0;
     this.maxRetries = 10;
     this.dropdownConfigs = [];
+    this.hasFilled = false;
     
     this.init();
   }
@@ -151,6 +152,9 @@ class TapdAutoFiller {
   }
 
   async checkAndFill() {
+    if (this.hasFilled) {
+      return;
+    }
     try {
       console.log('BST TAPD Filler: Requesting bug data from background...');
       // 获取待填充的数据
@@ -186,6 +190,16 @@ class TapdAutoFiller {
       
       // 填充描述
       const descFilled = await this.fillDescription(description);
+
+      if (titleFilled && descFilled) {
+        this.hasFilled = true;
+        await chrome.runtime.sendMessage({
+          action: 'updateBugStatus',
+          id: this.bugData.id,
+          status: 'consumed'
+        });
+        await chrome.runtime.sendMessage({ action: 'clearBugData' });
+      }
 
       // 根据描述尝试自动匹配下拉
       await this.autoSelectDropdowns(description);
