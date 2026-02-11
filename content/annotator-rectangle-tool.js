@@ -1,7 +1,7 @@
 // Bug Shot Turbo - 矩形标注工具版（微信风格）
 // 功能：主截图 + 多个矩形标注 + 每个矩形独立文字
 
-class RectangleAnnotator {
+var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
   constructor() {
     this.isActive = false;
     this.currentTool = 'select'; // select, rectangle
@@ -33,7 +33,9 @@ class RectangleAnnotator {
       issue: '',
       rectangles: [],
       pageURL: '',
-      timestamp: ''
+      timestamp: '',
+      secondMenuName: '',
+      secondMenus: []
     };
 
     this.init();
@@ -669,14 +671,14 @@ class RectangleAnnotator {
     textLabel.title = rectData.text; // 完整文字显示在title
     textLabel.style.cssText = `
       position: absolute;
-      bottom: -30px;
+      bottom: -70px;
       left: 0;
-      background: rgba(26, 173, 25, 0.9);
-      color: white;
+      // background: withite;
+      color: rgba(173, 50, 25, 0.9);
       padding: 6px 10px;
       border-radius: 3px;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 25px;
+      font-weight: 700;
       white-space: nowrap;
       max-width: 250px;
       overflow: hidden;
@@ -723,15 +725,13 @@ class RectangleAnnotator {
               `).join('')}
             </div>
           </div>
-          <div class="bst-final-tags" id="bst-final-tags-container">
-            <label>选择问题标签：</label>
-            <div class="bst-tag-list">
-              <button class="bst-tag" data-tag="按钮失效">按钮失效</button>
-              <button class="bst-tag" data-tag="表单校验">表单校验</button>
-              <button class="bst-tag" data-tag="样式错位">样式错位</button>
-              <button class="bst-tag" data-tag="接口报错">接口报错</button>
-              <button class="bst-tag" data-tag="其他">其他</button>
-            </div>
+          <div class="bst-final-input">
+            <label>处理人</label>
+            <input type="text" id="bst-assignee" placeholder="请输入处理人，如：张三">
+          </div>
+          <div class="bst-final-input">
+            <label>迭代</label>
+            <input type="text" id="bst-iteration" placeholder="请输入迭代，如：迭代名称">
           </div>
         </div>
         <div class="bst-final-footer">
@@ -758,15 +758,6 @@ class RectangleAnnotator {
   }
 
   bindFinalPanelEvents(panel) {
-    // 标签选择
-    panel.querySelectorAll('.bst-tag').forEach(tag => {
-      tag.addEventListener('click', () => {
-        panel.querySelectorAll('.bst-tag').forEach(t => t.classList.remove('active'));
-        tag.classList.add('active');
-        this.bugData.tag = tag.dataset.tag;
-      });
-    });
-
     // 关闭
     panel.querySelector('.bst-final-close').addEventListener('click', () => {
       panel.remove();
@@ -784,17 +775,118 @@ class RectangleAnnotator {
 
   }
 
-  async submitBugData(panel) {
-    if (!this.bugData.tag) {
-      this.showToast('请选择问题标签', 'warning');
-      return;
+  normalizeDomain(value) {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return '';
+    try {
+      const url = new URL(trimmed);
+      return `${url.origin}/`;
+    } catch (error) {
+      if (trimmed.startsWith('//')) {
+        try {
+          const url = new URL(`${window.location.protocol}${trimmed}`);
+          return `${url.origin}/`;
+        } catch (innerError) {
+          return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+        }
+      }
+      return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+    }
+  }
+
+  getPageDomain() {
+    try {
+      const url = new URL(window.location.href);
+      return `${url.origin}/`;
+    } catch (error) {
+      return `${window.location.origin}/`;
+    }
+  }
+
+  async getMenuRuleForPage() {
+    try {
+      const result = await chrome.storage.local.get(['config']);
+      const rules = Array.isArray(result.config?.menuRules) ? result.config.menuRules : [];
+      if (!rules.length) return null;
+      const pageDomain = this.normalizeDomain(this.getPageDomain());
+      return rules.find(rule => this.normalizeDomain(rule.domain) === pageDomain) || null;
+    } catch (error) {
+      console.warn('BST: Failed to load menu rules:', error);
+      return null;
+    }
+  }
+
+  evaluateXPathNodes(xpath, contextNode = document) {
+    if (!xpath) return [];
+    try {
+      const result = document.evaluate(xpath, contextNode, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const nodes = [];
+      for (let i = 0; i < result.snapshotLength; i += 1) {
+        nodes.push(result.snapshotItem(i));
+      }
+      return nodes;
+    } catch (error) {
+      console.warn('BST: XPath evaluate failed:', error);
+      return [];
+    }
+  }
+
+  isElementVisible(element) {
+    if (!element || !(element instanceof Element)) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  extractSecondMenus(rule) {
+    const nodes = this.evaluateXPathNodes(rule?.menuXPath);
+    const menus = [];
+    let activeName = '';
+    const activeClass = (rule?.activeClass || '').trim();
+    const titleSelector = (rule?.titleSelector || '').trim();
+
+    const readText = (node) => {
+      if (!node) return '';
+      const target = titleSelector ? node.querySelector(titleSelector) : null;
+      const text = (target || node).textContent || '';
+      return text.trim();
+    };
+
+    nodes.forEach(node => {
+      const text = readText(node);
+      if (text) menus.push(text);
+      if (!activeName && activeClass) {
+        const isActive = node.classList?.contains(activeClass) || node.querySelector?.(`.${activeClass}`);
+        if (isActive) activeName = text;
+      }
+    });
+
+    if (!activeName) {
+      const visibleNode = nodes.find(node => this.isElementVisible(node));
+      activeName = readText(visibleNode);
     }
 
+    return { activeName, menus };
+  }
+
+  async captureMenuInfo() {
+    const rule = await this.getMenuRuleForPage();
+    if (!rule || !rule.menuXPath) return;
+    const result = this.extractSecondMenus(rule);
+    if (result.menus.length) {
+      this.bugData.secondMenus = result.menus;
+    }
+    if (result.activeName) {
+      this.bugData.secondMenuName = result.activeName;
+    }
+  }
+
+  async submitBugData(panel) {
     // 自动生成 issue：所有矩形框描述按 "1、2、3、" 格式
     this.bugData.issue = this.rectangles.map(r => `${r.order}、${r.text}`).join(' ');
     this.bugData.pageURL = window.location.href;
     this.bugData.timestamp = new Date().toLocaleString('zh-CN');
     this.bugData.pathLast1 = window.location.pathname.split('/').pop() || 'page';
+    await this.captureMenuInfo();
 
     // 保存矩形数据
     this.bugData.rectangles = this.rectangles.map(r => ({
@@ -1436,13 +1528,19 @@ class RectangleAnnotator {
       issue: '',
       rectangles: [],
       pageURL: '',
-      timestamp: ''
+      timestamp: '',
+      secondMenuName: '',
+      secondMenus: []
     };
   }
-}
+};
 
 // 初始化
 console.log('BST: Loading Rectangle Annotator...');
-const rectangleAnnotator = new RectangleAnnotator();
-window.annotator = rectangleAnnotator;
-console.log('BST: Rectangle Annotator loaded. Use Alt+S to toggle.');
+if (window.annotator && typeof window.annotator.toggle === 'function') {
+  console.log('BST: Existing annotator found, reuse current instance.');
+} else {
+  window.annotator = new RectangleAnnotator();
+  console.log('BST: Rectangle Annotator loaded. Use Alt+S to toggle.');
+}
+window.RectangleAnnotator = RectangleAnnotator;

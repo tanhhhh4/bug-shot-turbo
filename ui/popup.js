@@ -105,7 +105,7 @@ class PopupManager {
         try {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['content/annotator-outline.js']
+            files: ['content/annotator-rectangle-tool.js']
           });
           console.log('Content script injected successfully');
         } catch (injectError) {
@@ -145,7 +145,7 @@ class PopupManager {
     // 帮助按钮
     document.getElementById('openHelp').addEventListener('click', () => {
       chrome.tabs.create({
-        url: 'https://github.com/your-repo/bug-shot-turbo/wiki'
+        url: chrome.runtime.getURL('使用说明.md')
       });
     });
   }
@@ -166,6 +166,14 @@ class PopupManager {
           title: "${issue}（${pathLast1}）",
           description: "【问题】${firstTag} - ${issue}\n【页面】${pageURL}\n【时间】${timestamp}\n【期望】<在此补充>\n【实际】<在此补充>\n（截图：粘贴后见下）"
         },
+        menuRules: [
+          {
+            domain: "https://supply-test.ycb51.cn/",
+            menuXPath: "/html/body/div[1]/div/section/section/div[1]/ul/li/ul/li",
+            activeClass: "is-active",
+            titleSelector: ".title"
+          }
+        ],
         tags: ["按钮失效", "表单校验", "样式错位", "接口报错", "其他"]
       };
       

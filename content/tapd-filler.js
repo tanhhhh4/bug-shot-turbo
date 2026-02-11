@@ -182,7 +182,7 @@ class TapdAutoFiller {
   async autoFill() {
     try {
       // 渲染模板
-      const title = this.renderTemplate(this.config.templates.title, this.bugData);
+      const title = this.buildTitleWithMenu(this.renderTemplate(this.config.templates.title, this.bugData));
       const description = this.renderTemplate(this.config.templates.description, this.bugData);
       
       // 填充标题
@@ -206,15 +206,8 @@ class TapdAutoFiller {
       
       if (titleFilled && descFilled) {
         // 显示成功提示
-        this.showToast('缺陷信息已自动填充，请在详情框中粘贴截图（Ctrl/Cmd+V）', 'success');
-        
-        // 更新数据状态
-        await chrome.runtime.sendMessage({
-          action: 'updateBugStatus',
-          id: this.bugData.id,
-          status: 'consumed'
-        });
-        
+        this.showToast('缺陷信息已自动填充，截图已尝试自动插入；如未显示可手动粘贴（Ctrl/Cmd+V）', 'success');
+
         // 尝试聚焦到描述框，方便用户粘贴图片
         this.focusDescriptionField();
       } else {
@@ -232,6 +225,14 @@ class TapdAutoFiller {
       console.error('Auto fill error:', error);
       this.showToast('自动填充出错：' + error.message, 'error');
     }
+  }
+
+  buildTitleWithMenu(title) {
+    const menuName = (this.bugData?.secondMenuName || '').trim();
+    if (!menuName) return title;
+    const prefix = `【${menuName}】`;
+    if ((title || '').startsWith(prefix)) return title;
+    return `${prefix}${title || ''}`.trim();
   }
 
   renderTemplate(template, data) {
@@ -365,7 +366,8 @@ class TapdAutoFiller {
                 event.initEvent('input', true, true);
                 body.dispatchEvent(event);
                 
-                // 将光标移动到【问题截图】位置，方便用户粘贴
+                // 自动插入截图并定位到【问题截图】位置
+                this.insertScreenshotIntoSection(iframeDoc, body);
                 this.moveCursorToScreenshotSection(iframeDoc, body);
                 
                 return true;
@@ -749,6 +751,61 @@ class TapdAutoFiller {
     } catch (e) {
       console.log('Move cursor error:', e);
     }
+  }
+
+  insertScreenshotIntoSection(iframeDoc, body) {
+    try {
+      const dataUrl = this.bugData?.screenshot;
+      if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+        return false;
+      }
+
+      if (body.innerHTML.includes(dataUrl) || body.querySelector('img[data-bst-screenshot=\"1\"]')) {
+        return true;
+      }
+
+      const walker = iframeDoc.createTreeWalker(
+        body,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while (node = walker.nextNode()) {
+        if (node.nodeValue && node.nodeValue.includes('【问题截图】')) {
+          let targetNode = node.parentNode;
+          while (targetNode && targetNode.nextSibling) {
+            targetNode = targetNode.nextSibling;
+            if (targetNode.nodeType === 1 && (targetNode.tagName === 'DIV' || targetNode.tagName === 'P')) {
+              break;
+            }
+          }
+
+          const img = iframeDoc.createElement('img');
+          img.src = dataUrl;
+          img.alt = 'screenshot';
+          img.style.maxWidth = '100%';
+          img.style.height = 'auto';
+          img.setAttribute('data-bst-screenshot', '1');
+
+          if (targetNode && targetNode.nodeType === 1) {
+            targetNode.appendChild(img);
+          } else {
+            body.appendChild(img);
+          }
+
+          const event = iframeDoc.createEvent('Event');
+          event.initEvent('input', true, true);
+          body.dispatchEvent(event);
+
+          return true;
+        }
+      }
+    } catch (e) {
+      console.log('Insert screenshot error:', e);
+    }
+    return false;
   }
 
   focusDescriptionField() {

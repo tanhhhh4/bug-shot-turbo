@@ -24,9 +24,9 @@
     <nav class="options-nav">
       <button class="nav-tab active" data-section="tapd">TAPD配置</button>
       <button class="nav-tab" data-section="templates">模板设置</button>
-      <button class="nav-tab" data-section="tags">标签管理</button>
       <button class="nav-tab" data-section="dropdowns">下拉配置</button>
-      <button class="nav-tab" data-section="ai">AI下拉匹配</button>
+      <button class="nav-tab" data-section="menu">菜单匹配</button>
+      <button class="nav-tab" data-section="ai">AI设置</button>
       <button class="nav-tab" data-section="shortcuts">快捷键</button>
       <button class="nav-tab" data-section="data">数据管理</button>
     </nav>
@@ -93,6 +93,25 @@
           </ul>
         </div>
       </section>
+      <section class="option-section" id="menu-section">
+  <div class="section-header">
+    <h2>菜单匹配</h2>
+    <p class="section-desc">按域名匹配，自动抓取当前页面的二级菜单名称</p>
+  </div>
+  <div class="menu-rules-toolbar">
+    <button id="addMenuRuleBtn" class="btn btn-primary btn-sm"><span class="icon">+</span> 新增规则</button>
+    <div class="hint">域名使用协议+域名，XPath 指向二级菜单列表</div>
+  </div>
+  <div id="menuRulesList" class="menu-rules-list"></div>
+  <div class="option-help">
+    <ul>
+      <li>域名：用于匹配当前页面，例如 https://supply-test.ycb51.cn/</li>
+      <li>XPath：指向二级菜单 li 列表，例如 /html/body/.../ul/li/ul/li</li>
+      <li>活动类名：用于定位当前所在的二级菜单</li>
+      <li>标题选择器：二级菜单内部标题元素的 CSS 选择器</li>
+    </ul>
+  </div>
+</section>
       <section class="option-section" id="ai-section">
         <div class="section-header">
           <h2>AI 下拉匹配</h2>
@@ -146,83 +165,6 @@
 【实际】<在此补充>
 （截图：粘贴后见下）"></textarea>
           <small>支持变量：${issue}, ${firstTag}, ${pageURL}, ${pathLast1}, ${timestamp}</small>
-        </div>
-      </section>
-      
-      <section class="option-section" id="tags-section">
-        <div class="section-header">
-          <h2>🏷️ 标签管理</h2>
-          <p class="section-desc">管理问题标签和分类</p>
-        </div>
-        
-        <!-- 标签管理头部工具栏 -->
-        <div class="tags-toolbar">
-          <div class="tags-search">
-            <input type="text" id="tagSearch" placeholder="搜索标签..." class="search-input">
-            <button id="addTagBtn" class="btn btn-primary btn-sm">
-              <span class="icon">+</span> 新增标签
-            </button>
-          </div>
-          
-          <div class="tags-stats">
-            <span id="tagsCount">总计: 0 个标签</span>
-            <span id="categoriesCount">分类: 0 个</span>
-          </div>
-        </div>
-
-        <!-- 标签管理设置 -->
-        <div class="tags-settings">
-          <h3>标签设置</h3>
-          <div class="setting-row">
-            <label for="maxRecent">最近使用显示数量</label>
-            <input type="number" id="maxRecent" min="3" max="20" value="8" class="number-input">
-          </div>
-          <div class="setting-row">
-            <label for="showCategories">启用分类视图</label>
-            <input type="checkbox" id="showCategories" checked>
-          </div>
-          <div class="setting-row">
-            <label for="showColors">显示标签颜色</label>
-            <input type="checkbox" id="showColors" checked>
-          </div>
-          <div class="setting-row">
-            <label for="allowQuickCreate">允许快速创建新标签</label>
-            <input type="checkbox" id="allowQuickCreate" checked>
-          </div>
-        </div>
-
-        <!-- 分类管理 -->
-        <div class="categories-section">
-          <h3>分类管理</h3>
-          <div class="categories-list" id="categoriesList">
-            <!-- 动态生成分类列表 -->
-          </div>
-          <button id="addCategoryBtn" class="btn btn-secondary btn-sm">
-            <span class="icon">+</span> 新增分类
-          </button>
-        </div>
-
-        <!-- 标签列表 -->
-        <div class="tags-list-container">
-          <div class="tags-list-header">
-            <span>标签列表</span>
-            <select id="tagsSortBy" class="sort-select">
-              <option value="category">按分类排序</option>
-              <option value="usage">按使用频率</option>
-              <option value="name">按名称排序</option>
-              <option value="recent">按最近使用</option>
-            </select>
-          </div>
-          
-          <div class="tags-list" id="tagsList">
-            <!-- 动态生成标签列表 -->
-          </div>
-          
-          <div class="tags-list-footer">
-            <button id="selectAllTags" class="btn btn-sm">全选</button>
-            <button id="deleteSelectedTags" class="btn btn-danger btn-sm">删除选中</button>
-            <button id="exportSelectedTags" class="btn btn-secondary btn-sm">导出选中</button>
-          </div>
         </div>
       </section>
       
@@ -318,8 +260,6 @@
     </div>
   </div>
 
-  <script src="../config/default-tags.js"></script>
-  <script src="../config/tags-manager.js"></script>
-  <script src="options.js"></script>
+      <script src="options.js"></script>
 </body>
 </html>

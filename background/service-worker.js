@@ -80,7 +80,7 @@ class BackgroundService {
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          files: ['content/annotator-outline.js']
+          files: ['content/annotator-rectangle-tool.js']
         });
         console.log('BST Background: Script injected, waiting for initialization...');
       } catch (jsError) {
@@ -94,22 +94,29 @@ class BackgroundService {
             target: { tabId: tabId },
             func: () => {
               // 直接在页面上下文中执行
-              if (typeof ScreenshotAnnotator !== 'undefined') {
-                // 如果已有实例，直接使用
-                if (window.annotator) {
-                  window.annotator.toggle();
-                  console.log('BST: Toggled existing annotator');
-                } else {
-                  // 创建新实例
-                  window.annotator = new ScreenshotAnnotator();
-                  window.annotator.toggle();
-                  console.log('BST: Created and toggled new annotator');
-                }
+              if (window.annotator && typeof window.annotator.toggle === 'function') {
+                window.annotator.toggle();
+                console.log('BST: Toggled existing annotator');
                 return { success: true };
-              } else {
-                console.error('BST: ScreenshotAnnotator class not found');
-                return { success: false, error: 'ScreenshotAnnotator not defined' };
               }
+
+              if (typeof RectangleAnnotator !== 'undefined') {
+                window.annotator = new RectangleAnnotator();
+                window.annotator.toggle();
+                console.log('BST: Created and toggled RectangleAnnotator');
+                return { success: true };
+              }
+
+              // 兼容历史实现
+              if (typeof ScreenshotAnnotator !== 'undefined') {
+                window.annotator = new ScreenshotAnnotator();
+                window.annotator.toggle();
+                console.log('BST: Created and toggled ScreenshotAnnotator');
+                return { success: true };
+              }
+
+              console.error('BST: Annotator class not found');
+              return { success: false, error: 'No annotator class found' };
             }
           });
           console.log('BST Background: Toggle executed successfully');
@@ -302,6 +309,14 @@ class BackgroundService {
         title: "${issue}（${pathLast1}）",
         description: "【问题】${firstTag} - ${issue}\n【页面】${pageURL}\n【时间】${timestamp}\n【期望】<在此补充>\n【实际】<在此补充>\n（截图：粘贴后见下）"
       },
+      menuRules: [
+        {
+          domain: "https://supply-test.ycb51.cn/",
+          menuXPath: "/html/body/div[1]/div/section/section/div[1]/ul/li/ul/li",
+          activeClass: "is-active",
+          titleSelector: ".title"
+        }
+      ],
       tags: ["按钮失效", "表单校验", "样式错位", "接口报错", "其他"]
     };
 

@@ -204,7 +204,7 @@ body {
 
 .option-subsection {
   margin-top: 30px;
-  padding-top: 30px;
+  padding: 30px 40px 40px;
   border-top: 1px solid var(--border-color);
 }
 
@@ -1030,4 +1030,77 @@ body {
   border: 1px dashed var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
+}
+
+/* Menu rules */
+.menu-rules-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.menu-rules-toolbar .hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.menu-rules-list {
+  display: grid;
+  gap: 14px;
+}
+
+.menu-rule-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+}
+
+.menu-rule-card .card-row {
+  margin-bottom: 10px;
+}
+
+.menu-rule-card .card-row.header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.menu-rule-card .card-row.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.menu-rule-card label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.menu-rule-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  background: var(--bg-secondary);
+}
+
+.menu-rule-card input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.menu-rule-card .btn-text {
+  background: transparent;
+  color: #fa5252;
+  border: none;
+  cursor: pointer;
 }
