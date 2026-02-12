@@ -8,7 +8,7 @@ class TapdAutoFiller {
     this.maxRetries = 10;
     this.dropdownConfigs = [];
     this.hasFilled = false;
-    
+
     this.init();
   }
 
@@ -16,7 +16,7 @@ class TapdAutoFiller {
     console.log('BST TAPD Filler: Initializing...');
     // 加载配置
     await this.loadConfig();
-    
+
     // 检查是否是TAPD新建缺陷页面
     if (this.isTapdNewBugPage()) {
       console.log('BST TAPD Filler: TAPD new bug page detected, waiting for page load...');
@@ -25,20 +25,20 @@ class TapdAutoFiller {
         console.log('BST TAPD Filler: First attempt to check for pending bug data...');
         this.checkAndFill();
       }, 2000);
-      
+
       // 再次尝试，以防第一次失败
       setTimeout(() => {
         console.log('BST TAPD Filler: Second attempt to check for pending bug data...');
         this.checkAndFill();
       }, 4000);
-      
+
       // 第三次尝试，给更多时间加载
       setTimeout(() => {
         console.log('BST TAPD Filler: Third attempt to check for pending bug data...');
         this.checkAndFill();
       }, 6000);
     }
-    
+
     // 监听页面变化（SPA路由切换）
     this.observePageChanges();
   }
@@ -72,31 +72,31 @@ class TapdAutoFiller {
 
   isTapdNewBugPage() {
     const url = window.location.href;
-    
+
     // 检查是否是配置的TAPD域名
     const domains = this.config?.tapd?.domains || ["tapd.cn", "tapd.tencent.com"];
     const isTapdDomain = domains.some(domain => url.includes(domain));
-    
+
     // 检查是否包含配置的项目ID（如果配置了的话）
     const projectIds = this.config?.tapd?.projectIds || [];
     let hasValidProjectId = true;
     if (projectIds.length > 0) {
       hasValidProjectId = projectIds.some(id => url.includes(`/${id}/`));
     }
-    
+
     // 检查是否是新建缺陷页面
-    const isNewBug = url.includes('/bugtrace/bugs/add') || 
-                     url.includes('/bugtrace/bugs/addBUG') || // 添加大写BUG支持
-                     url.includes('/bug/add') ||
-                     url.includes('view=addBug') ||
-                     url.includes('new_bug');
-    
+    const isNewBug = url.includes('/bugtrace/bugs/add') ||
+      url.includes('/bugtrace/bugs/addBUG') || // 添加大写BUG支持
+      url.includes('/bug/add') ||
+      url.includes('view=addBug') ||
+      url.includes('new_bug');
+
     const isValid = isTapdDomain && hasValidProjectId && isNewBug;
-    
+
     if (isValid) {
       console.log('BST: Detected TAPD new bug page:', url);
     }
-    
+
     return isValid;
   }
 
@@ -114,10 +114,10 @@ class TapdAutoFiller {
         }
       }
     });
-    
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true 
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
     });
   }
 
@@ -126,25 +126,25 @@ class TapdAutoFiller {
     console.log('BST TAPD Filler: Manual test started');
     console.log('Current URL:', window.location.href);
     console.log('Is TAPD page detected:', this.isTapdNewBugPage());
-    
+
     // 测试选择器
     const titleSelectors = [
       "input#BugTitle", "input[name='data[Bug][title]']", "input[name='title']",
       "input[placeholder*='标题']", "input[type='text']:first-of-type"
     ];
-    
+
     console.log('BST TAPD Filler: Testing title selectors...');
     titleSelectors.forEach(selector => {
       const element = document.querySelector(selector);
       console.log(`Selector "${selector}":`, element);
     });
-    
+
     const descSelectors = [
-      "iframe#BugDescription_ifr", "div[contenteditable='true']", 
+      "iframe#BugDescription_ifr", "div[contenteditable='true']",
       "textarea[name*='description']", "[role='textbox']"
     ];
-    
-    console.log('BST TAPD Filler: Testing description selectors...');  
+
+    console.log('BST TAPD Filler: Testing description selectors...');
     descSelectors.forEach(selector => {
       const element = document.querySelector(selector);
       console.log(`Selector "${selector}":`, element);
@@ -158,12 +158,12 @@ class TapdAutoFiller {
     try {
       console.log('BST TAPD Filler: Requesting bug data from background...');
       // 获取待填充的数据
-      const response = await chrome.runtime.sendMessage({ 
-        action: 'getBugData' 
+      const response = await chrome.runtime.sendMessage({
+        action: 'getBugData'
       });
-      
+
       console.log('BST TAPD Filler: Response from background:', response);
-      
+
       if (response && response.success && response.data) {
         console.log('BST TAPD Filler: Bug data received:', response.data);
         this.bugData = response.data;
@@ -181,13 +181,39 @@ class TapdAutoFiller {
 
   async autoFill() {
     try {
+      // === AI 文案优化 ===
+      const aiCopywriting = await this.fetchAiCopywriting().catch(e => {
+        console.log('BST TAPD Filler: AI copywriting failed, using original text', e?.message);
+        return null;
+      });
+
+      // 如果 AI 返回了优化文案，替换 bugData 中的内容用于渲染
+      const renderData = { ...this.bugData };
+      if (aiCopywriting) {
+        console.log('BST TAPD Filler: AI copywriting result', aiCopywriting);
+
+        // 优化标题：用 AI 返回的 title 覆盖 issuesSummary（标题模板用）
+        if (aiCopywriting.title) {
+          renderData.issuesSummary = aiCopywriting.title;
+        }
+
+        // 优化描述：用 AI 返回的 descriptions 覆盖 rectangles 的文本
+        if (Array.isArray(aiCopywriting.descriptions) && aiCopywriting.descriptions.length > 0
+          && Array.isArray(renderData.rectangles)) {
+          renderData.rectangles = renderData.rectangles.map((r, i) => ({
+            ...r,
+            text: aiCopywriting.descriptions[i] || r.text
+          }));
+        }
+      }
+
       // 渲染模板
-      const title = this.buildTitleWithMenu(this.renderTemplate(this.config.templates.title, this.bugData));
-      const description = this.renderTemplate(this.config.templates.description, this.bugData);
-      
+      const title = this.buildTitleWithMenu(this.renderTemplate(this.config.templates.title, renderData));
+      const description = this.renderTemplate(this.config.templates.description, renderData);
+
       // 填充标题
       const titleFilled = await this.fillTitle(title);
-      
+
       // 填充描述
       const descFilled = await this.fillDescription(description);
 
@@ -203,10 +229,11 @@ class TapdAutoFiller {
 
       // 根据描述尝试自动匹配下拉
       await this.autoSelectDropdowns(description);
-      
+
       if (titleFilled && descFilled) {
         // 显示成功提示
-        this.showToast('缺陷信息已自动填充，截图已尝试自动插入；如未显示可手动粘贴（Ctrl/Cmd+V）', 'success');
+        const aiHint = aiCopywriting ? '（AI 已优化文案）' : '';
+        this.showToast(`缺陷信息已自动填充${aiHint}，截图已尝试自动插入；如未显示可手动粘贴（Ctrl/Cmd+V）`, 'success');
 
         // 尝试聚焦到描述框，方便用户粘贴图片
         this.focusDescriptionField();
@@ -261,7 +288,7 @@ class TapdAutoFiller {
         "input#BugTitle",
         "input[name='data[Bug][title]']",
         "input[name='title']",
-        "input[name='bug_title']", 
+        "input[name='bug_title']",
         "input[data-field='title']",
         this.config.selectors.title,
         "input[placeholder='插入标题']",
@@ -271,10 +298,10 @@ class TapdAutoFiller {
         ".form-control[name*='title']",
         ".ant-input[placeholder*='标题']" // Ant Design组件
       ];
-      
+
       console.log('BST TAPD Filler: Trying to fill title with:', title);
       console.log('BST TAPD Filler: Available selectors:', selectors);
-      
+
       for (const selector of selectors) {
         console.log('BST TAPD Filler: Trying title selector:', selector);
         const input = document.querySelector(selector);
@@ -283,25 +310,25 @@ class TapdAutoFiller {
           // 模拟用户输入
           input.focus();
           input.value = title;
-          
+
           // 触发各种事件，确保框架能检测到变化
           input.dispatchEvent(new Event('input', { bubbles: true }));
           input.dispatchEvent(new Event('change', { bubbles: true }));
           input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-          
+
           // 如果是React/Vue应用，可能需要直接设置属性
           const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype, 
+            window.HTMLInputElement.prototype,
             'value'
           ).set;
           nativeInputValueSetter.call(input, title);
-          
+
           input.dispatchEvent(new Event('input', { bubbles: true }));
-          
+
           return true;
         }
       }
-      
+
       console.log('Title input not found');
       return false;
     } catch (error) {
@@ -326,7 +353,7 @@ class TapdAutoFiller {
         "iframe[title*='富文本']",
         "iframe[title*='编辑器']"
       ];
-      
+
       for (const selector of iframeSelectors) {
         const iframe = document.querySelector(selector);
         if (iframe) {
@@ -339,13 +366,13 @@ class TapdAutoFiller {
               this.config.selectors.descBody,
               "body[contenteditable='true']"
             ];
-            
+
             for (const bodySelector of bodySelectors) {
               const body = iframeDoc.querySelector(bodySelector);
               if (body) {
                 // TAPD的编辑器已经有默认模板，我们需要在特定位置插入内容
                 const existingContent = body.innerHTML;
-                
+
                 // 查找【问题描述】的位置
                 if (existingContent.includes('【问题描述】')) {
                   // 在【问题描述】后面插入内容
@@ -360,16 +387,16 @@ class TapdAutoFiller {
                   const formattedDesc = description.replace(/\n/g, '<br>');
                   body.innerHTML = `<div>${formattedDesc}</div><br>` + body.innerHTML;
                 }
-                
+
                 // 触发事件
                 const event = iframeDoc.createEvent('Event');
                 event.initEvent('input', true, true);
                 body.dispatchEvent(event);
-                
+
                 // 自动插入截图并定位到【问题截图】位置
                 this.insertScreenshotIntoSection(iframeDoc, body);
                 this.moveCursorToScreenshotSection(iframeDoc, body);
-                
+
                 return true;
               }
             }
@@ -378,14 +405,14 @@ class TapdAutoFiller {
           }
         }
       }
-      
+
       // 如果iframe方式失败，尝试直接查找可编辑区域
       const directSelectors = [
         "div[contenteditable='true']",
         "textarea[name*='description']",
         "textarea[name*='detail']",
         "textarea[name*='content']",
-        "textarea#BugDescription", 
+        "textarea#BugDescription",
         "textarea[data-field*='description']",
         ".editor-content[contenteditable='true']",
         ".rich-editor [contenteditable='true']",
@@ -395,7 +422,7 @@ class TapdAutoFiller {
         ".ql-editor", // Quill编辑器
         ".w-e-text" // wangEditor
       ];
-      
+
       for (const selector of directSelectors) {
         const element = document.querySelector(selector);
         if (element) {
@@ -412,7 +439,7 @@ class TapdAutoFiller {
           return true;
         }
       }
-      
+
       console.log('Description field not found');
       return false;
     } catch (error) {
@@ -577,6 +604,103 @@ class TapdAutoFiller {
     }
   }
 
+  /**
+   * AI 文案优化：对用户输入的问题描述进行规范化润色
+   * 规则：不臆想、不无中生有，保留编号结构
+   * @returns {Promise<{title: string, descriptions: string[]}|null>}
+   */
+  async fetchAiCopywriting() {
+    const ai = this.config?.ai;
+    if (!ai?.enable || !ai.endpoint || !ai.apiKey || !ai.model) {
+      console.log('BST TAPD Filler: AI disabled, skip copywriting');
+      return null;
+    }
+
+    // 收集原始文本
+    const rectangles = this.bugData?.rectangles || [];
+    const tagText = this.bugData?.tag || this.bugData?.firstTag || '';
+    if (!rectangles.length && !this.bugData?.issuesSummary) {
+      console.log('BST TAPD Filler: No text to optimize');
+      return null;
+    }
+
+    // 构建原始描述文本
+    const originalTexts = rectangles.length > 0
+      ? rectangles.map(r => `${r.order}、${r.text || ''}`).join('\n')
+      : (this.bugData?.issuesSummary || '');
+
+    const prompt = [
+      '你是一个 BUG 文案优化助手，负责将测试人员输入的问题描述润色为更专业、清晰的表达。',
+      '',
+      '严格规则：',
+      '1. 仅对用户输入的问题描述进行规范化润色，使表达更专业清晰；',
+      '2. 绝对不要添加用户没有提到的信息，不要臆想、不要无中生有；',
+      '3. 如果用户输入包含多条（如 1、xxx  2、xxx），必须逐条保留编号并分别优化，不要合并；',
+      '4. 返回 JSON 格式：{"title": "优化后的简洁标题", "descriptions": ["优化后的描述1", "优化后的描述2"]}',
+      '5. title 应该简洁概括所有问题，不超过 30 字；',
+      '6. descriptions 数组的长度必须和输入的条目数完全一致；',
+      '7. 不要输出 JSON 以外的任何文字。',
+      '',
+      `问题标签：${tagText || '（无）'}`,
+      '',
+      '用户原始输入：',
+      originalTexts
+    ].join('\n');
+
+    console.log('BST TAPD Filler: AI copywriting request', { originalTexts, tagText });
+
+    const controller = new AbortController();
+    const timeoutMs = ai.timeoutMs || 6000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(ai.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ai.apiKey}`
+        },
+        body: JSON.stringify({
+          model: ai.model,
+          messages: [
+            { role: 'system', content: '你是一个 BUG 文案优化助手。只返回 JSON，不要输出其他内容。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      const data = await res.json();
+      console.log('BST TAPD Filler: AI copywriting response raw', data);
+
+      const content = data?.choices?.[0]?.message?.content || '';
+      let parsed = null;
+      try {
+        const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        console.log('BST TAPD Filler: AI copywriting response not valid JSON', content);
+        return null;
+      }
+
+      // 基本校验：不能比原始条目多
+      if (parsed && Array.isArray(parsed.descriptions)) {
+        if (parsed.descriptions.length > rectangles.length && rectangles.length > 0) {
+          console.log('BST TAPD Filler: AI returned more descriptions than input, trimming');
+          parsed.descriptions = parsed.descriptions.slice(0, rectangles.length);
+        }
+      }
+
+      console.log('BST TAPD Filler: AI copywriting parsed result', parsed);
+      return parsed;
+    } catch (error) {
+      clearTimeout(timer);
+      console.log('BST TAPD Filler: AI copywriting request failed', { error: error?.message, timeoutMs });
+      return null;
+    }
+  }
+
   findElementBySelectors(selectors = []) {
     for (const sel of selectors) {
       if (sel.css) {
@@ -722,14 +846,14 @@ class TapdAutoFiller {
         null,
         false
       );
-      
+
       let node;
       while (node = walker.nextNode()) {
         if (node.nodeValue && node.nodeValue.includes('【问题截图】')) {
           // 找到了，将光标定位到这个节点后面
           const range = iframeDoc.createRange();
           const sel = iframeDoc.getSelection();
-          
+
           // 找到【问题截图】后的下一个div或p
           let targetNode = node.parentNode;
           while (targetNode && targetNode.nextSibling) {
@@ -738,7 +862,7 @@ class TapdAutoFiller {
               break;
             }
           }
-          
+
           if (targetNode) {
             range.selectNodeContents(targetNode);
             range.collapse(false);
@@ -824,7 +948,7 @@ class TapdAutoFiller {
         sel.addRange(range);
         return;
       }
-      
+
       // iframe中的元素
       const iframes = document.querySelectorAll("iframe.ke-edit-iframe, iframe.editor-iframe");
       for (const iframe of iframes) {
@@ -855,7 +979,7 @@ class TapdAutoFiller {
     if (existingToast) {
       existingToast.remove();
     }
-    
+
     const toast = document.createElement('div');
     toast.className = `bst-toast bst-toast-${type}`;
     toast.textContent = message;
@@ -872,7 +996,7 @@ class TapdAutoFiller {
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       animation: slideIn 0.3s ease;
     `;
-    
+
     // 添加动画
     const style = document.createElement('style');
     style.textContent = `
@@ -888,7 +1012,7 @@ class TapdAutoFiller {
       }
     `;
     document.head.appendChild(style);
-    
+
     if (type === 'success') {
       toast.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
     } else if (type === 'error') {
@@ -896,9 +1020,9 @@ class TapdAutoFiller {
     } else {
       toast.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
     }
-    
+
     document.body.appendChild(toast);
-    
+
     // 自动移除
     setTimeout(() => {
       toast.style.animation = 'slideOut 0.3s ease';
