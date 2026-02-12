@@ -261,16 +261,8 @@
   <div id="saveStatus" class="toast"></div>
   <input type="file" id="fileInput" style="display: none;" accept=".json">
 
+  <script src="../config/tags-manager.js"></script>
   <script src="options.js"></script>
-  <script>
-    // Simple script to update header title based on active tab
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const text = tab.querySelector('.nav-text').textContent;
-        document.getElementById('pageTitle').textContent = text;
-      });
-    });
-  </script>
 </body>
 
 </html>

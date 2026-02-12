@@ -1,4 +1,4 @@
-// Bug Shot Turbo - Options鑴氭湰 - 鍙墿灞曟爣绛剧増鏈?
+// Bug Shot Turbo - Options脚本 - 可扩展标签版本
 
 class OptionsManager {
   constructor() {
@@ -14,16 +14,16 @@ class OptionsManager {
   async init() {
     console.log('BST Options: Initializing...');
 
-    // 绛夊緟鏍囩绠＄悊鍣ㄥ垵濮嬪寲
+    // 等待标签管理器初始化
     await this.initTagsManager();
 
-    // 鍔犺浇褰撳墠閰嶇疆
+    // 加载当前配置
     await this.loadConfig();
 
-    // 鏄剧ず閰嶇疆
+    // 显示配置
     this.displayConfig();
 
-    // 缁戝畾浜嬩欢
+    // 绑定事件
     this.bindEvents();
 
     console.log('BST Options: Initialized successfully');
@@ -40,15 +40,22 @@ class OptionsManager {
   async loadConfig() {
     try {
       const result = await chrome.storage.local.get(['config']);
-      this.config = result.config || this.getDefaultConfig();
+      const defaultConfig = this.getDefaultConfig();
+
+      // Merge loaded config with defaults to ensure all fields exist
+      this.config = result.config ? { ...defaultConfig, ...result.config } : defaultConfig;
+
+      // Ensure critical nested objects exist
+      this.config.tapd = { ...defaultConfig.tapd, ...(this.config.tapd || {}) };
+      this.config.selectors = { ...defaultConfig.selectors, ...(this.config.selectors || {}) };
+      this.config.templates = { ...defaultConfig.templates, ...(this.config.templates || {}) };
+      this.config.ai = { ...defaultConfig.ai, ...(this.config.ai || {}) };
+
       if (!Array.isArray(this.config.dropdowns)) {
         this.config.dropdowns = [];
       }
       if (!Array.isArray(this.config.menuRules)) {
-        this.config.menuRules = this.getDefaultConfig().menuRules;
-      }
-      if (!this.config.ai) {
-        this.config.ai = this.getDefaultConfig().ai;
+        this.config.menuRules = defaultConfig.menuRules;
       }
     } catch (error) {
       console.error('Load config error:', error);
@@ -68,8 +75,8 @@ class OptionsManager {
         descBody: "body#tinymce, body.mce-content-body"
       },
       templates: {
-        title: document.getElementById('titleTemplate').value,
-        description: document.getElementById('descTemplate').value
+        title: "${issue}（${pathLast1}）",
+        description: "【问题】${firstTag} - ${issue}\n【页面】${pageURL}\n【时间】${timestamp}\n【期望】<在此补充>\n【实际】<在此补充>\n（截图：粘贴后见下）"
       },
       ai: {
         enable: false,
@@ -91,19 +98,19 @@ class OptionsManager {
   }
 
   displayConfig() {
-    // 鏄剧ずTAPD椤圭洰閰嶇疆
+    // 显示TAPD项目配置
     this.displayTapdConfig();
 
-    // 鏄剧ず鏍囩绠＄悊
+    // 显示标签管理
     this.displayTagsManagement();
 
-    // 鏄剧ずAI閰嶇疆
+    // 显示AI配置
     this.displayAiConfig();
 
-    // 鏄剧ず鑿滃崟瑙勫垯
+    // 显示菜单规则
     this.renderMenuRules();
 
-    // 缁戝畾 AI 娴嬭瘯
+    // 绑定 AI 测试
     const aiTestBtn = document.getElementById('aiTestBtn');
     if (aiTestBtn) {
       aiTestBtn.addEventListener('click', () => this.testAiConnectivity());
@@ -135,20 +142,20 @@ class OptionsManager {
   async displayTagsManagement() {
     if (!window.BST_TagsManager) return;
 
-    // 鏄剧ず鏍囩璁剧疆
+    // 显示标签设置
     const settings = window.BST_TagsManager.getSettings();
     document.getElementById('maxRecent').value = settings.maxRecent || 8;
     document.getElementById('showCategories').checked = settings.showCategories !== false;
     document.getElementById('showColors').checked = settings.showColors !== false;
     document.getElementById('allowQuickCreate').checked = settings.allowQuickCreate !== false;
 
-    // 鏄剧ず鍒嗙被鍒楄〃
+    // 显示分类列表
     await this.renderCategories();
 
-    // 鏄剧ず鏍囩鍒楄〃
+    // 显示标签列表
     await this.renderTagsList();
 
-    // 鏇存柊缁熻淇℃伅
+    // 更新统计信息
     this.updateStats();
   }
 
@@ -160,7 +167,7 @@ class OptionsManager {
       <div class="category-chip" data-category-id="${category.id}">
         <div class="color-dot" style="background: ${category.color}"></div>
         <span>${category.name}</span>
-        <button class="edit-btn" onclick="editCategory('${category.id}')">鉁忥笍</button>
+        <button class="edit-btn" onclick="editCategory('${category.id}')">✏️</button>
       </div>
     `).join('');
   }
@@ -172,12 +179,12 @@ class OptionsManager {
 
     let filteredTags = tags;
 
-    // 鎼滅储杩囨护
+    // 搜索过滤
     if (searchTerm) {
       filteredTags = window.BST_TagsManager.searchTags(searchTerm);
     }
 
-    // 鎺掑簭
+    // 排序
     switch (sortBy) {
       case 'usage':
         filteredTags.sort((a, b) => (tagUsage[b.id]?.count || 0) - (tagUsage[a.id]?.count || 0));
@@ -211,22 +218,22 @@ class OptionsManager {
             <span class="tag-name">${tag.name}</span>
             <span class="tag-category">${tag.category}</span>
             ${tag.hotkey ? `<span class="tag-hotkey">${tag.hotkey}</span>` : ''}
-            ${tag.favorite ? '<span class="tag-favorite">鈽?/span>' : ''}
+            ${tag.favorite ? '<span class="tag-favorite">⭐</span>' : ''}
           </div>
           <div class="tag-stats">
-            <span>浣跨敤 ${usage.count}</span>
+            <span>使用 ${usage.count}</span>
             ${usage.lastUsedAt ? `<span>${this.formatDate(usage.lastUsedAt)}</span>` : ''}
           </div>
           <div class="tag-actions">
-            <button class="tag-action-btn" onclick="optionsManager.editTag('${tag.id}')" title="缂栬緫">鉁忥笍</button>
-            <button class="tag-action-btn" onclick="optionsManager.duplicateTag('${tag.id}')" title="澶嶅埗">馃搵</button>
+            <button class="tag-action-btn" onclick="optionsManager.editTag('${tag.id}')" title="编辑">✏️</button>
+            <button class="tag-action-btn" onclick="optionsManager.duplicateTag('${tag.id}')" title="复制">📋</button>
           </div>
         </div>
       `;
     }).join('');
   }
 
-  // ===== 涓嬫媺閰嶇疆娓叉煋涓庨噰闆?=====
+  // ===== 下拉配置渲染与采集 =====
 
   renderDropdowns() {
     const list = document.getElementById('dropdownList');
@@ -234,7 +241,7 @@ class OptionsManager {
 
     const data = Array.isArray(this.config.dropdowns) ? this.config.dropdowns : [];
     if (!data.length) {
-      list.innerHTML = '<div class="empty-state">鏆傛棤涓嬫媺閰嶇疆锛岀偣鍑烩€滄柊澧炰笅鎷夆€濆紑濮嬮厤缃?/div>';
+      list.innerHTML = '<div class="empty-state">暂无下拉配置，点击“新增下拉”开始配置</div>';
       return;
     }
 
@@ -324,7 +331,7 @@ class OptionsManager {
   }
 
   addDropdownCard() {
-    // 鍏堝悓姝ュ綋鍓嶈〃鍗曪紝鍐嶆柊澧?
+    // 先同步当前表单，再新增
     this.config.dropdowns = this.collectDropdownsFromDom();
     this.config.dropdowns.push({
       name: '',
@@ -379,7 +386,7 @@ class OptionsManager {
       const candidates = candidatesRaw.split(/\n|[,，]/).map(s => s.trim()).filter(Boolean);
 
       if (!name && selectors.length === 0) {
-        return; // 璺宠繃绌哄崱
+        return; // 跳过空卡
       }
 
       const item = {
@@ -397,7 +404,7 @@ class OptionsManager {
     return dropdowns;
   }
 
-  // ===== 鑿滃崟瑙勫垯娓叉煋涓庨噰闆?=====
+  // ===== 菜单规则渲染与采集 =====
 
   renderMenuRules() {
     const list = document.getElementById('menuRulesList');
@@ -405,7 +412,7 @@ class OptionsManager {
 
     const data = Array.isArray(this.config.menuRules) ? this.config.menuRules : [];
     if (!data.length) {
-      list.innerHTML = '<div class="empty-state">鏆傛棤鑿滃崟瑙勫垯锛岀偣鍑烩€滄柊澧炶鍒欌€濆紑濮嬮厤缃?/div>';
+      list.innerHTML = '<div class="empty-state">暂无菜单规则，点击“新增规则”开始配置</div>';
       return;
     }
 
@@ -598,15 +605,15 @@ class OptionsManager {
   }
 
   bindEvents() {
-    // Tab鍒囨崲
+    // Tab切换
     this.bindTabNavigation();
 
-    // 淇濆瓨閰嶇疆鎸夐挳
+    // 保存配置按钮
     document.getElementById('saveOptions').addEventListener('click', () => {
       this.saveConfig();
     });
 
-    // 閲嶇疆鎸夐挳
+    // 重置按钮
     const resetBtn = document.getElementById('resetOptions');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
@@ -614,7 +621,7 @@ class OptionsManager {
       });
     }
 
-    // 鏁版嵁绠＄悊鎸夐挳
+    // 数据管理按钮
     document.getElementById('exportData').addEventListener('click', () => {
       this.exportConfig();
     });
@@ -631,26 +638,26 @@ class OptionsManager {
       this.clearHistory();
     });
 
-    // 涓嬫媺閰嶇疆
+    // 下拉配置
     const addDropdownBtn = document.getElementById('addDropdownBtn');
     if (addDropdownBtn) {
       addDropdownBtn.addEventListener('click', () => this.addDropdownCard());
     }
     this.bindDropdownListEvents();
 
-    // 鑿滃崟瑙勫垯閰嶇疆
+    // 菜单规则配置
     const addMenuRuleBtn = document.getElementById('addMenuRuleBtn');
     if (addMenuRuleBtn) {
       addMenuRuleBtn.addEventListener('click', () => this.addMenuRuleCard());
     }
     this.bindMenuRulesEvents();
 
-    // 鏂囦欢瀵煎叆
+    // 文件导入
     document.getElementById('fileInput').addEventListener('change', (e) => {
       this.importConfig(e.target.files[0]);
     });
 
-    // 鏍囩绠＄悊宸茬Щ闄?
+    // 标签管理已移除
   }
 
   bindTabNavigation() {
@@ -661,23 +668,30 @@ class OptionsManager {
       tab.addEventListener('click', () => {
         const targetSection = tab.dataset.section;
 
-        // 绉婚櫎鎵€鏈夋椿鍔ㄧ姸鎬?
+        // 移除所有活动状态
         tabs.forEach(t => t.classList.remove('active'));
         sections.forEach(s => s.classList.remove('active'));
 
-        // 娣诲姞娲诲姩鐘舵€?
+        // 更新标题
+        const navText = tab.querySelector('.nav-text')?.textContent;
+        const pageTitle = document.getElementById('pageTitle');
+        if (navText && pageTitle) {
+          pageTitle.textContent = navText;
+        }
+
+        // 添加活动状态
         tab.classList.add('active');
         const section = document.getElementById(`${targetSection}-section`);
         if (section) {
           section.classList.add('active');
         }
 
-        // 淇濆瓨褰撳墠鏍囩椤靛埌localStorage
+        // 保存当前标签页到localStorage
         localStorage.setItem('bst-active-tab', targetSection);
       });
     });
 
-    // 鎭㈠涓婃鐨勬爣绛鹃〉
+    // 恢复上次的标签页
     const lastTab = localStorage.getItem('bst-active-tab');
     if (lastTab) {
       const tab = document.querySelector(`[data-section="${lastTab}"]`);
@@ -711,14 +725,14 @@ class OptionsManager {
     const allSelected = allRows.length > 0 && this.selectedTags.size === allRows.length;
 
     if (allSelected) {
-      // 鍙栨秷鍏ㄩ€?
+      // 取消全选
       this.selectedTags.clear();
       allRows.forEach(row => {
         row.classList.remove('selected');
         row.querySelector('.tag-checkbox').checked = false;
       });
     } else {
-      // 鍏ㄩ€?
+      // 全选
       allRows.forEach(row => {
         const tagId = row.dataset.tagId;
         this.selectedTags.add(tagId);
@@ -748,7 +762,7 @@ class OptionsManager {
 
     if (tagId) {
       const tag = window.BST_TagsManager.getTagById(tagId);
-      title.textContent = '缂栬緫鏍囩';
+      title.textContent = '编辑标签';
       deleteBtn.style.display = 'block';
 
       document.getElementById('tagName').value = tag.name;
@@ -757,11 +771,11 @@ class OptionsManager {
       document.getElementById('tagHotkey').value = tag.hotkey || '';
       document.getElementById('tagFavorite').checked = tag.favorite;
     } else {
-      title.textContent = '鏂板鏍囩';
+      title.textContent = '新增标签';
       deleteBtn.style.display = 'none';
 
       document.getElementById('tagName').value = '';
-      document.getElementById('tagCategory').value = '鍔熻兘';
+      document.getElementById('tagCategory').value = '功能';
       document.getElementById('tagColor').value = window.BST_TagsConfig.getNextColor(window.BST_TagsManager.getAllTags());
       document.getElementById('tagHotkey').value = '';
       document.getElementById('tagFavorite').checked = false;
@@ -799,7 +813,7 @@ class OptionsManager {
   selectColorPreset(color) {
     document.getElementById('tagColor').value = color;
 
-    // 鏇存柊閫変腑鐘舵€?
+    // 更新选中状态
     document.querySelectorAll('.color-preset').forEach(preset => {
       preset.classList.remove('selected');
     });
@@ -861,8 +875,8 @@ class OptionsManager {
     try {
       const newTag = {
         ...tag,
-        name: tag.name + ' (鍓湰)',
-        hotkey: '', // 娓呯┖蹇嵎閿伩鍏嶅啿绐?
+        name: tag.name + ' (副本)',
+        hotkey: '', // 清空快捷键避免冲突
         favorite: false
       };
       delete newTag.id;
@@ -928,7 +942,7 @@ class OptionsManager {
 
   async saveConfig() {
     try {
-      // 鏄剧ず鍔犺浇鐘舵€?
+      // 显示加载状态
       const saveBtn = document.getElementById('saveOptions');
       const originalText = saveBtn.innerHTML;
       if (!this.validateDropdownMappings()) {
@@ -965,7 +979,7 @@ class OptionsManager {
       await chrome.storage.local.set({ config: newConfig, dropdownConfigs: newConfig.dropdowns });
       this.config = newConfig;
 
-      // 鎭㈠鎸夐挳鐘舵€?
+      // 恢复按钮状态
       setTimeout(() => {
         saveBtn.innerHTML = originalText;
         saveBtn.disabled = false;
@@ -976,7 +990,7 @@ class OptionsManager {
       console.error('Save config error:', error);
       this.showStatus('保存失败: ' + error.message, 'error');
 
-      // 鎭㈠鎸夐挳鐘舵€?
+      // 恢复按钮状态
       const saveBtn = document.getElementById('saveOptions');
       saveBtn.innerHTML = '<span class="btn-icon">💾</span><span class="btn-text">保存设置</span>';
       saveBtn.disabled = false;
@@ -1056,7 +1070,7 @@ class OptionsManager {
       try {
         await chrome.storage.local.remove(['history', 'lastPackage', 'tagUsage']);
         this.showStatus('配置已成功保存', 'success');
-        await this.displayTagsManagement(); // 鍒锋柊浣跨敤缁熻
+        await this.displayTagsManagement(); // 刷新使用统计
       } catch (error) {
         console.error('Clear history error:', error);
         this.showStatus('保存失败: ' + error.message, 'error');
@@ -1079,7 +1093,7 @@ class OptionsManager {
     status.innerHTML = message;
     status.className = `save-status ${type} show`;
 
-    // 鑷姩闅愯棌
+    // 自动隐藏
     clearTimeout(this.statusTimeout);
     this.statusTimeout = setTimeout(() => {
       status.classList.remove('show');
@@ -1087,7 +1101,7 @@ class OptionsManager {
   }
 }
 
-// 鍒濆鍖?
+// 初始化
 document.addEventListener('DOMContentLoaded', () => {
   window.optionsManager = new OptionsManager();
 });
