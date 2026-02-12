@@ -1,265 +1,276 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bug Shot Turbo - 设置</title>
+  <title>Bug Shot Turbo - Settings</title>
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="options.css">
 </head>
+
 <body>
-  <div class="options-container">
-    <header class="options-header">
-      <div class="header-content">
-        <div class="logo-section">
-          <div class="logo-icon">🐛</div>
-          <div class="logo-text">
-            <h1>Bug Shot Turbo</h1>
-            <p>智能缺陷提交助手</p>
-          </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-wrapper">
+          <img src="../assets/icons/icon48.png" alt="Logo" class="logo">
+          <span class="brand-name">Bug Shot</span>
         </div>
-        <div class="version-info">v1.0.0</div>
       </div>
-    </header>
-    
-    <nav class="options-nav">
-      <button class="nav-tab active" data-section="tapd">TAPD配置</button>
-      <button class="nav-tab" data-section="templates">模板设置</button>
-      <button class="nav-tab" data-section="dropdowns">下拉配置</button>
-      <button class="nav-tab" data-section="menu">菜单匹配</button>
-      <button class="nav-tab" data-section="ai">AI设置</button>
-      <button class="nav-tab" data-section="shortcuts">快捷键</button>
-      <button class="nav-tab" data-section="data">数据管理</button>
-    </nav>
 
-    
-    <main class="options-content">
-      <section class="option-section active" id="tapd-section">
-        <div class="section-header">
-          <h2>📋 TAPD项目配置</h2>
-          <p class="section-desc">配置TAPD项目信息和选择器</p>
-        </div>
-        <div class="option-group">
-          <label for="tapdProjectIds">项目ID列表</label>
-          <input type="text" id="tapdProjectIds" placeholder="47910877, 12345678">
-          <small>输入TAPD项目ID，多个ID用逗号分隔。项目ID可在TAPD的URL中找到</small>
-        </div>
-        
-        <div class="option-group">
-          <label for="tapdDomains">TAPD域名</label>
-          <input type="text" id="tapdDomains" placeholder="tapd.cn, tapd.tencent.com" value="tapd.cn, tapd.tencent.com">
-          <small>支持的TAPD域名，通常不需要修改</small>
-        </div>
-      </section>
-      
-      <section class="option-subsection">
-        <h3>高级选择器配置</h3>
-        <div class="option-group">
-          <label for="titleSelector">标题字段选择器</label>
-          <input type="text" id="titleSelector" placeholder="input[name='bug[title]']">
-          <small>用于定位TAPD缺陷标题输入框的CSS选择器</small>
-        </div>
-        
-        <div class="option-group">
-          <label for="descIframeSelector">描述iframe选择器</label>
-          <input type="text" id="descIframeSelector" placeholder="iframe.ke-edit-iframe">
-          <small>用于定位TAPD富文本编辑器iframe的CSS选择器</small>
-        </div>
-        
-        <div class="option-group">
-          <label for="descBodySelector">描述内容选择器</label>
-          <input type="text" id="descBodySelector" placeholder="body.ke-content">
-          <small>iframe内部可编辑区域的CSS选择器</small>
-        </div>
-      </section>
+      <nav class="sidebar-nav">
+        <button class="nav-tab active" data-section="tapd">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-text">TAPD 配置</span>
+        </button>
+        <button class="nav-tab" data-section="templates">
+          <span class="nav-icon">📝</span>
+          <span class="nav-text">模板设置</span>
+        </button>
+        <button class="nav-tab" data-section="dropdowns">
+          <span class="nav-icon">▼</span>
+          <span class="nav-text">下拉配置</span>
+        </button>
+        <button class="nav-tab" data-section="menu">
+          <span class="nav-icon">📑</span>
+          <span class="nav-text">菜单匹配</span>
+        </button>
+        <button class="nav-tab" data-section="ai">
+          <span class="nav-icon">✨</span>
+          <span class="nav-text">AI 助手</span>
+        </button>
+        <button class="nav-tab" data-section="shortcuts">
+          <span class="nav-icon">⌨️</span>
+          <span class="nav-text">快捷键</span>
+        </button>
+        <button class="nav-tab" data-section="data">
+          <span class="nav-icon">💾</span>
+          <span class="nav-text">数据管理</span>
+        </button>
+      </nav>
 
-      
-      <section class="option-section" id="dropdowns-section">
-        <div class="section-header">
-          <h2>下拉配置</h2>
-          <p class="section-desc">为 TAPD 下拉字段配置选择器和关键词映射，自动匹配你的描述</p>
-        </div>
-        <div class="dropdown-toolbar">
-          <button id="addDropdownBtn" class="btn btn-primary btn-sm"><span class="icon">+</span> 新增下拉</button>
-          <div class="hint">支持原生 select、Antd/Element 自定义下拉；未匹配或未定位会自动跳过</div>
-        </div>
-        <div id="dropdownList" class="dropdown-list"></div>
-        <div class="option-help">
-          <ul>
-            <li>名称：方便识别该下拉，例如“问题类型”“所属模块”。</li>
-            <li>类型：native/antd/element/custom。</li>
-            <li>选择器：CSS 或 XPath，先用 CSS，不行再 XPath。</li>
-            <li>可选：展开选择器（open selector）/选项选择器（options selector），自定义下拉时使用。</li>
-            <li>映射：值 + 关键词，描述包含任意关键词就选中该值；无匹配则跳过。</li>
-          </ul>
-        </div>
-      </section>
-      <section class="option-section" id="menu-section">
-  <div class="section-header">
-    <h2>菜单匹配</h2>
-    <p class="section-desc">按域名匹配，自动抓取当前页面的二级菜单名称</p>
-  </div>
-  <div class="menu-rules-toolbar">
-    <button id="addMenuRuleBtn" class="btn btn-primary btn-sm"><span class="icon">+</span> 新增规则</button>
-    <div class="hint">域名使用协议+域名，XPath 指向二级菜单列表</div>
-  </div>
-  <div id="menuRulesList" class="menu-rules-list"></div>
-  <div class="option-help">
-    <ul>
-      <li>域名：用于匹配当前页面，例如 https://supply-test.ycb51.cn/</li>
-      <li>XPath：指向二级菜单 li 列表，例如 /html/body/.../ul/li/ul/li</li>
-      <li>活动类名：用于定位当前所在的二级菜单</li>
-      <li>标题选择器：二级菜单内部标题元素的 CSS 选择器</li>
-    </ul>
-  </div>
-</section>
-      <section class="option-section" id="ai-section">
-        <div class="section-header">
-          <h2>AI 下拉匹配</h2>
-          <p class="section-desc">启用后，AI 会基于标注文字在候选值中自动选择下拉项</p>
-        </div>
-        <div class="option-group">
-          <label>
-            <input type="checkbox" id="aiEnable">
-            启用 AI 下拉匹配
-          </label>
-        </div>
-        <div class="option-group">
-          <label for="aiEndpoint">API Endpoint</label>
-          <input type="text" id="aiEndpoint" placeholder="https://api.example.com/v1/chat/completions">
-        </div>
-        <div class="option-group">
-          <label for="aiKey">API Key</label>
-          <input type="password" id="aiKey" placeholder="sk-xxx">
-        </div>
-        <div class="option-group">
-          <label for="aiModel">模型</label>
-          <input type="text" id="aiModel" placeholder="gpt-3.5-turbo">
-        </div>
-        <div class="option-group">
-          <label for="aiTimeout">超时 (毫秒)</label>
-          <input type="number" id="aiTimeout" min="1000" max="20000" step="500" value="5000">
-          <small>超时或失败会回退到本地默认逻辑</small>
-        </div>
-        <div class="option-group">
-          <button id="aiTestBtn" class="btn btn-secondary">测试 AI 连通性</button>
-          <small id="aiTestStatus"></small>
-        </div>
-      </section>
-<section class="option-section" id="templates-section">
-        <div class="section-header">
-          <h2>📝 模板配置</h2>
-          <p class="section-desc">自定义Bug标题和描述模板</p>
-        </div>
-        <div class="option-group">
-          <label for="titleTemplate">标题模板</label>
-          <input type="text" id="titleTemplate" placeholder="${issue}（${pathLast1}）">
-          <small>支持变量：${issue}, ${firstTag}, ${pathLast1}, ${timestamp}</small>
-        </div>
-        
-        <div class="option-group">
-          <label for="descTemplate">描述模板</label>
-          <textarea id="descTemplate" rows="8" placeholder="【问题】${firstTag} - ${issue}
-【页面】${pageURL}
-【时间】${timestamp}
-【期望】<在此补充>
-【实际】<在此补充>
-（截图：粘贴后见下）"></textarea>
-          <small>支持变量：${issue}, ${firstTag}, ${pageURL}, ${pathLast1}, ${timestamp}</small>
-        </div>
-      </section>
-      
-      <section class="option-section" id="shortcuts-section">
-        <div class="section-header">
-          <h2>⌨️ 快捷键设置</h2>
-          <p class="section-desc">配置快捷键操作</p>
-        </div>
-        <div class="option-group">
-          <label>开启/关闭标注工具</label>
-          <div class="shortcut-display">Alt + S</div>
-          <small>Chrome扩展快捷键需要在扩展管理页面设置</small>
-        </div>
-      </section>
-      
-      <section class="option-section" id="data-section">
-        <div class="section-header">
-          <h2>💾 数据管理</h2>
-          <p class="section-desc">导入导出配置和清理数据</p>
-        </div>
-        <div class="data-actions">
-          <button id="exportData" class="btn btn-secondary">导出配置</button>
-          <button id="importData" class="btn btn-secondary">导入配置</button>
-          <button id="resetDefaults" class="btn btn-secondary">恢复默认</button>
-          <button id="clearHistory" class="btn btn-danger">清除历史</button>
-        </div>
-      </section>
-    </main>
-    
-    <footer class="options-footer">
-      <div class="footer-content">
-        <div class="footer-left">
-          <span class="footer-info">所有更改将自动保存</span>
-        </div>
-        <div class="footer-right">
-          <button id="resetOptions" class="btn btn-secondary">重置设置</button>
+      <div class="sidebar-footer">
+        <span class="version-badge">v0.1.0</span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-bar">
+        <h1 id="pageTitle">TAPD 配置</h1>
+        <div class="actions">
+          <button id="resetOptions" class="btn btn-ghost">重置</button>
           <button id="saveOptions" class="btn btn-primary">
-            <span class="btn-icon">💾</span>
-            <span class="btn-text">保存设置</span>
+            <span>保存更改</span>
           </button>
         </div>
-      </div>
-      <div id="saveStatus" class="save-status"></div>
-    </footer>
-  </div>
-  
-  <input type="file" id="fileInput" style="display: none;" accept=".json">
-  
-  <!-- 标签编辑对话框 -->
-  <div id="tagEditModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modalTitle">编辑标签</h3>
-        <button class="modal-close" id="closeModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="tagName">标签名称</label>
-          <input type="text" id="tagName" placeholder="输入标签名称" required>
-        </div>
-        <div class="form-group">
-          <label for="tagCategory">分类</label>
-          <select id="tagCategory">
-            <!-- 动态生成分类选项 -->
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="tagColor">颜色</label>
-          <div class="color-picker-container">
-            <input type="color" id="tagColor">
-            <div class="color-presets" id="colorPresets">
-              <!-- 动态生成颜色预设 -->
+      </header>
+
+      <div class="content-scroll-area">
+        <!-- TAPD Section -->
+        <section class="option-section active" id="tapd-section">
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>项目连接</h2>
+              <p>配置 TAPD 项目信息以启用自动提交。</p>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="tapdProjectIds">项目 ID 列表</label>
+                <input type="text" id="tapdProjectIds" placeholder="例如: 47910877, 12345678" class="input-lg">
+                <p class="help-text">可在 TAPD URL 中找到，如 https://www.tapd.cn/12345678/...</p>
+              </div>
+              <div class="form-group">
+                <label for="tapdDomains">TAPD 域名</label>
+                <input type="text" id="tapdDomains" value="tapd.cn, tapd.tencent.com" class="input-lg">
+              </div>
             </div>
           </div>
-        </div>
-        <div class="form-group">
-          <label for="tagHotkey">快捷键</label>
-          <input type="text" id="tagHotkey" placeholder="如: 1, a, F1" maxlength="3">
-          <small>数字1-9或字母a-z，留空表示无快捷键</small>
-        </div>
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="tagFavorite">
-            <span>设为收藏</span>
-          </label>
-        </div>
+
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>高级选择器</h2>
+              <p>自定义页面元素定位，通常无需修改。</p>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="titleSelector">标题输入框</label>
+                <input type="text" id="titleSelector" placeholder="input[name='bug[title]']" class="code-input">
+              </div>
+              <div class="form-group">
+                <label for="descIframeSelector">描述编辑器 Iframe</label>
+                <input type="text" id="descIframeSelector" placeholder="iframe.ke-edit-iframe" class="code-input">
+              </div>
+              <div class="form-group">
+                <label for="descBodySelector">描述内容区域</label>
+                <input type="text" id="descBodySelector" placeholder="body.ke-content" class="code-input">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Templates Section -->
+        <section class="option-section" id="templates-section">
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>缺陷模板</h2>
+              <p>定义自动生成的标题和描述格式。</p>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="titleTemplate">标题模板</label>
+                <input type="text" id="titleTemplate" class="input-lg" placeholder="${issue}（${pathLast1}）">
+                <div class="tags-cloud">
+                  <span class="tag-pill">${issue}</span>
+                  <span class="tag-pill">${firstTag}</span>
+                  <span class="tag-pill">${pathLast1}</span>
+                  <span class="tag-pill">${timestamp}</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="descTemplate">描述模板</label>
+                <textarea id="descTemplate" rows="12" class="input-area"></textarea>
+                <div class="tags-cloud">
+                  <span class="tag-pill">${pageURL}</span>
+                  <span class="tag-pill">${timestamp}</span>
+                  <span class="tag-pill">${issue}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dropdowns Section -->
+        <section class="option-section" id="dropdowns-section">
+          <div class="settings-card">
+            <div class="card-header with-action">
+              <div>
+                <h2>下拉自动填充</h2>
+                <p>根据描述关键词自动选择下拉项。</p>
+              </div>
+              <button id="addDropdownBtn" class="btn btn-secondary">
+                <span>+ 新增规则</span>
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="dropdownList" class="rules-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Menu Section -->
+        <section class="option-section" id="menu-section">
+          <div class="settings-card">
+            <div class="card-header with-action">
+              <div>
+                <h2>菜单抓取</h2>
+                <p>自动识别当前页面的二级菜单路径。</p>
+              </div>
+              <button id="addMenuRuleBtn" class="btn btn-secondary">
+                <span>+ 新增规则</span>
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="menuRulesList" class="rules-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI Section -->
+        <section class="option-section" id="ai-section">
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>AI 增强</h2>
+              <p>使用 LLM 进行更智能的字段匹配。</p>
+            </div>
+            <div class="card-body">
+              <div class="form-group checkbox-row">
+                <label class="switch">
+                  <input type="checkbox" id="aiEnable">
+                  <span class="slider round"></span>
+                </label>
+                <span class="label-text">启用 AI 匹配</span>
+              </div>
+
+              <div class="form-group">
+                <label for="aiEndpoint">API Endpoint</label>
+                <input type="text" id="aiEndpoint" placeholder="https://api.openai.com/v1/chat/completions">
+              </div>
+
+              <div class="form-group">
+                <label for="aiKey">API Key</label>
+                <input type="password" id="aiKey" placeholder="sk-...">
+              </div>
+
+              <div class="form-group two-col">
+                <div>
+                  <label for="aiModel">模型名称</label>
+                  <input type="text" id="aiModel" placeholder="gpt-3.5-turbo">
+                </div>
+                <div>
+                  <label for="aiTimeout">超时 (ms)</label>
+                  <input type="number" id="aiTimeout" value="5000">
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button id="aiTestBtn" class="btn btn-secondary">测试连接</button>
+                <span id="aiTestStatus" class="status-text"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Shortcuts Section -->
+        <section class="option-section" id="shortcuts-section">
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>快捷键</h2>
+            </div>
+            <div class="card-body">
+              <div class="shortcut-row">
+                <span>开启/关闭标注工具</span>
+                <kbd>Alt + S</kbd>
+              </div>
+              <p class="help-text mt-2">如需修改，请前往 chrome://extensions/shortcuts</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Data Section -->
+        <section class="option-section" id="data-section">
+          <div class="settings-card">
+            <div class="card-header">
+              <h2>数据管理</h2>
+            </div>
+            <div class="card-body">
+              <div class="button-grid">
+                <button id="exportData" class="btn btn-secondary">导出配置</button>
+                <button id="importData" class="btn btn-secondary">导入配置</button>
+                <button id="resetDefaults" class="btn btn-secondary">恢复默认</button>
+                <button id="clearHistory" class="btn btn-danger-ghost">清除历史记录</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="modal-footer">
-        <button id="deleteTagBtn" class="btn btn-danger">删除</button>
-        <button id="cancelTagBtn" class="btn btn-secondary">取消</button>
-        <button id="saveTagBtn" class="btn btn-primary">保存</button>
-      </div>
-    </div>
+    </main>
   </div>
 
-      <script src="options.js"></script>
+  <div id="saveStatus" class="toast"></div>
+  <input type="file" id="fileInput" style="display: none;" accept=".json">
+
+  <script src="options.js"></script>
+  <script>
+    // Simple script to update header title based on active tab
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const text = tab.querySelector('.nav-text').textContent;
+        document.getElementById('pageTitle').textContent = text;
+      });
+    });
+  </script>
 </body>
+
 </html>

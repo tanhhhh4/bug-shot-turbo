@@ -1,58 +1,76 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <title>Bug Shot Turbo</title>
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="popup-container">
-    <header class="popup-header">
-      <img src="../assets/icons/icon48.png" alt="Logo" class="logo">
-      <div class="header-text">
-        <h1>Bug Shot Turbo</h1>
-        <p class="tagline">一次输入，处处复用</p>
+    <header class="popup-header glass">
+      <div class="logo-wrapper">
+        <img src="../assets/icons/icon48.png" alt="Logo" class="logo">
+        <span class="brand-name">Bug Shot Turbo</span>
       </div>
+      <button id="openOptions" class="btn-icon" title="设置">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+          </path>
+        </svg>
+      </button>
     </header>
-    
+
     <main class="popup-content">
-      <section class="quick-actions">
-        <button id="startCapture" class="btn btn-primary">
-          <span class="icon">📸</span>
-          开始截图标注
-          <span class="shortcut">Alt+S</span>
-        </button>
-      </section>
-      
-      <section class="recent-bugs">
-        <h3>最近的缺陷</h3>
-        <div id="recentList" class="recent-list">
-          <div class="empty-state">暂无记录</div>
+      <button id="startCapture" class="hero-card">
+        <div class="hero-icon-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
         </div>
-      </section>
-      
-      <section class="statistics">
-        <h3>使用统计</h3>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <span class="stat-value" id="totalBugs">0</span>
-            <span class="stat-label">总提交数</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value" id="successRate">0%</span>
-            <span class="stat-label">成功率</span>
-          </div>
+        <div class="hero-text">
+          <h2>开始截图标注</h2>
+          <span class="shortcut-badge">Alt+S</span>
+        </div>
+        <div class="hero-glow"></div>
+      </button>
+
+      <div class="stats-row">
+        <div class="stat-pill">
+          <span class="stat-value" id="totalBugs">0</span>
+          <span class="stat-label">提交</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-value" id="successRate">0%</span>
+          <span class="stat-label">成功率</span>
+        </div>
+      </div>
+
+      <section class="recent-section">
+        <div class="section-header">
+          <h3>最近记录</h3>
+          <button id="clearData" class="btn-xs-text">清除</button>
+        </div>
+        <div id="recentList" class="recent-list">
+          <div class="empty-state">Let's verify bugs together</div>
         </div>
       </section>
     </main>
-    
+
     <footer class="popup-footer">
-      <button id="openOptions" class="btn-text">设置</button>
-      <button id="clearData" class="btn-text">清除数据</button>
-      <button id="openHelp" class="btn-text">帮助</button>
+      <button id="openHelp" class="footer-link">帮助文档</button>
+      <span class="version">v0.1.0</span>
     </footer>
   </div>
-  
+
   <script src="popup.js"></script>
 </body>
+
 </html>
