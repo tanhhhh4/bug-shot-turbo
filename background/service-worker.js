@@ -33,23 +33,23 @@ class BackgroundService {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       console.log('BST Background: Toggle command received, active tab:', tab?.id, tab?.url);
-      
+
       if (!tab) {
         console.warn('BST Background: No active tab found');
         return;
       }
-      
+
       // 检查是否是受限页面
-      if (!tab.url || 
-          tab.url.startsWith('chrome://') || 
-          tab.url.startsWith('chrome-extension://') || 
-          tab.url.startsWith('edge://') ||
-          tab.url.startsWith('about:') ||
-          tab.url === 'about:blank') {
+      if (!tab.url ||
+        tab.url.startsWith('chrome://') ||
+        tab.url.startsWith('chrome-extension://') ||
+        tab.url.startsWith('edge://') ||
+        tab.url.startsWith('about:') ||
+        tab.url === 'about:blank') {
         console.warn('BST Background: Cannot run on restricted page:', tab.url);
         return;
       }
-      
+
       try {
         const response = await chrome.tabs.sendMessage(tab.id, { action: 'toggleAnnotation' });
         console.log('BST Background: Message sent to tab, response:', response);
@@ -65,7 +65,7 @@ class BackgroundService {
   async toggleAnnotationWithInjection(tabId, sendResponse) {
     try {
       console.log('BST Background: Injecting and toggling annotation for tab', tabId);
-      
+
       // 先注入CSS
       try {
         await chrome.scripting.insertCSS({
@@ -75,7 +75,7 @@ class BackgroundService {
       } catch (cssError) {
         console.log('BST Background: CSS may already be injected:', cssError.message);
       }
-      
+
       // 再注入JS
       try {
         await chrome.scripting.executeScript({
@@ -86,7 +86,7 @@ class BackgroundService {
       } catch (jsError) {
         console.log('BST Background: Script may already be injected:', jsError.message);
       }
-      
+
       // 直接执行toggle，不依赖消息传递
       setTimeout(async () => {
         try {
@@ -137,33 +137,33 @@ class BackgroundService {
       case 'captureVisibleTab':
         this.captureScreenshot(sender.tab, sendResponse);
         break;
-        
+
       case 'saveBugData':
         this.saveBugData(request.data, sendResponse);
         break;
-        
+
       case 'getBugData':
         this.getBugData(sendResponse);
         break;
-        
+
       case 'clearBugData':
         this.clearBugData(sendResponse);
         break;
-        
+
       case 'updateBugStatus':
         this.updateBugStatus(request.id, request.status, sendResponse);
         break;
-        
+
       case 'toggleAnnotationViaBackground':
         // 备用方式：通过background script注入并触发
         this.toggleAnnotationWithInjection(request.tabId, sendResponse);
         break;
-        
+
       case 'openTapdPage':
         // 通过background script打开新标签页
         this.openTapdPage(sendResponse);
         break;
-        
+
       default:
         sendResponse({ success: false, error: 'Unknown action' });
     }
@@ -185,7 +185,7 @@ class BackgroundService {
   async saveBugData(data, sendResponse) {
     try {
       console.log('BST Background: Received bug data to save:', data);
-      
+
       // 生成唯一ID
       data.id = `bug_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       // 如果没有timestamp，才添加
@@ -193,11 +193,11 @@ class BackgroundService {
         data.timestamp = new Date().toLocaleString('zh-CN');
       }
       data.status = 'pending';
-      
+
       console.log('BST Background: Processed bug data:', data);
 
       // 保存到storage
-      await chrome.storage.local.set({ 
+      await chrome.storage.local.set({
         lastPackage: data,
         lastUpdateTime: Date.now()
       });
@@ -206,12 +206,12 @@ class BackgroundService {
       const result = await chrome.storage.local.get(['history']);
       let history = result.history || [];
       history.unshift(data);
-      
+
       // 保留最近10条
       if (history.length > 10) {
         history = history.slice(0, 10);
       }
-      
+
       await chrome.storage.local.set({ history });
 
       // 更新统计数据
@@ -253,13 +253,13 @@ class BackgroundService {
   async updateBugStatus(id, status, sendResponse) {
     try {
       const result = await chrome.storage.local.get(['lastPackage', 'history']);
-      
+
       // 更新lastPackage状态
       if (result.lastPackage && result.lastPackage.id === id) {
         result.lastPackage.status = status;
         await chrome.storage.local.set({ lastPackage: result.lastPackage });
       }
-      
+
       // 更新历史记录中的状态
       if (result.history) {
         const index = result.history.findIndex(item => item.id === id);
@@ -297,7 +297,7 @@ class BackgroundService {
     // 初始化配置（更新为TAPD实际的选择器）
     const defaultConfig = {
       tapd: {
-        projectIds: ["47910877"], // 支持多个项目ID
+        projectIds: [], // 请在扩展设置中配置您的 TAPD 项目 ID
         domains: ["tapd.cn", "tapd.tencent.com"] // 支持的TAPD域名
       },
       selectors: {
@@ -327,14 +327,14 @@ class BackgroundService {
   async openTapdPage(sendResponse) {
     try {
       // Load configuration from storage
-      let tapdUrl = 'https://www.tapd.cn/47910877/bugtrace/bugs/add'; // fallback default
-      
+      let tapdUrl = null; // 从配置读取，不再硬编码
+
       try {
         const result = await chrome.storage.local.get(['config']);
         if (result.config && result.config.tapd && result.config.tapd.projectIds && result.config.tapd.projectIds.length > 0) {
           const projectId = result.config.tapd.projectIds[0]; // Use first project ID
-          const domain = result.config.tapd.domains && result.config.tapd.domains.length > 0 
-            ? result.config.tapd.domains[0] 
+          const domain = result.config.tapd.domains && result.config.tapd.domains.length > 0
+            ? result.config.tapd.domains[0]
             : 'tapd.cn';
           tapdUrl = `https://www.${domain}/${projectId}/bugtrace/bugs/add`;
           console.log('BST Background: Using configured TAPD URL:', tapdUrl);
@@ -344,10 +344,16 @@ class BackgroundService {
       } catch (configError) {
         console.warn('BST Background: Failed to load config, using default TAPD URL:', configError);
       }
-      
-      const newTab = await chrome.tabs.create({ 
-        url: tapdUrl, 
-        active: true 
+
+      if (!tapdUrl) {
+        console.warn('BST Background: No TAPD project configured');
+        sendResponse({ success: false, error: '请先在扩展设置中配置 TAPD 项目 ID' });
+        return;
+      }
+
+      const newTab = await chrome.tabs.create({
+        url: tapdUrl,
+        active: true
       });
       console.log('BST Background: Successfully opened TAPD page in new tab:', newTab.id);
       sendResponse({ success: true, tabId: newTab.id });

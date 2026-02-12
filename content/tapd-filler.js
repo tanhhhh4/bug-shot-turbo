@@ -48,7 +48,7 @@ class TapdAutoFiller {
       const result = await chrome.storage.local.get(['config', 'dropdownConfigs']);
       this.config = result.config || {
         tapd: {
-          projectIds: ["47910877"],
+          projectIds: [],
           domains: ["tapd.cn", "tapd.tencent.com"]
         },
         selectors: {

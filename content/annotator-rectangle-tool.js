@@ -38,6 +38,14 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
       secondMenus: []
     };
 
+    // 预绑定事件处理函数，确保 add/remove 使用相同引用
+    this._onMainMouseDown = this.onMainMouseDown.bind(this);
+    this._onMainMouseMove = this.onMainMouseMove.bind(this);
+    this._onMainMouseUp = this.onMainMouseUp.bind(this);
+    this._onRectMouseDown = this.onRectMouseDown.bind(this);
+    this._onRectMouseMove = this.onRectMouseMove.bind(this);
+    this._onRectMouseUp = this.onRectMouseUp.bind(this);
+
     this.init();
   }
 
@@ -117,7 +125,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
 
       // 特殊处理扩展上下文失效错误
       if (error.message?.includes('Extension context invalidated') ||
-          error.message?.includes('扩展已重新加载')) {
+        error.message?.includes('扩展已重新加载')) {
         this.showToast('⚠️ 扩展已更新，请刷新页面（按 F5）后重试', 'warning');
       } else {
         this.showToast('截图失败: ' + error.message, 'error');
@@ -169,9 +177,9 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
   // ========== 主截图区域选择 ==========
 
   setupMainSelectionEvents() {
-    this.overlay.addEventListener('mousedown', this.onMainMouseDown.bind(this));
-    this.overlay.addEventListener('mousemove', this.onMainMouseMove.bind(this));
-    this.overlay.addEventListener('mouseup', this.onMainMouseUp.bind(this));
+    this.overlay.addEventListener('mousedown', this._onMainMouseDown);
+    this.overlay.addEventListener('mousemove', this._onMainMouseMove);
+    this.overlay.addEventListener('mouseup', this._onMainMouseUp);
   }
 
   onMainMouseDown(e) {
@@ -280,9 +288,9 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
     }
 
     // 移除主选择的事件监听
-    this.overlay.removeEventListener('mousedown', this.onMainMouseDown);
-    this.overlay.removeEventListener('mousemove', this.onMainMouseMove);
-    this.overlay.removeEventListener('mouseup', this.onMainMouseUp);
+    this.overlay.removeEventListener('mousedown', this._onMainMouseDown);
+    this.overlay.removeEventListener('mousemove', this._onMainMouseMove);
+    this.overlay.removeEventListener('mouseup', this._onMainMouseUp);
 
     // 显示工具栏
     this.showToolbar();
@@ -411,9 +419,9 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
   }
 
   setupRectangleEvents() {
-    this.overlay.addEventListener('mousedown', this.onRectMouseDown.bind(this));
-    this.overlay.addEventListener('mousemove', this.onRectMouseMove.bind(this));
-    this.overlay.addEventListener('mouseup', this.onRectMouseUp.bind(this));
+    this.overlay.addEventListener('mousedown', this._onRectMouseDown);
+    this.overlay.addEventListener('mousemove', this._onRectMouseMove);
+    this.overlay.addEventListener('mouseup', this._onRectMouseUp);
   }
 
   onRectMouseDown(e) {
@@ -720,7 +728,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
               ${this.rectangles.map(r => `
                 <div class="bst-rect-item">
                   <span class="bst-rect-item-num">${r.order}</span>
-                  <span class="bst-rect-item-text">${r.text}</span>
+                  <span class="bst-rect-item-text">${this.escapeHTML(r.text)}</span>
                 </div>
               `).join('')}
             </div>
@@ -773,6 +781,11 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
       this.submitBugData(panel);
     });
 
+  }
+  escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
   }
 
   normalizeDomain(value) {
@@ -961,7 +974,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
           const labelSize = 24 * dpr;
           ctx.fillStyle = '#1aad19';
           ctx.beginPath();
-          ctx.arc(relX + labelSize/2, relY - labelSize/2, labelSize/2, 0, Math.PI * 2);
+          ctx.arc(relX + labelSize / 2, relY - labelSize / 2, labelSize / 2, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.strokeStyle = 'white';
@@ -972,7 +985,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
           ctx.font = `bold ${12 * dpr}px Arial`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(rect.order.toString(), relX + labelSize/2, relY - labelSize/2);
+          ctx.fillText(rect.order.toString(), relX + labelSize / 2, relY - labelSize / 2);
 
           // 绘制文字标签
           ctx.fillStyle = 'rgba(26, 173, 25, 0.9)';
@@ -1028,7 +1041,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
   }
 
   async redirectToTAPD() {
-    let tapdUrl = 'https://www.tapd.cn/47910877/bugtrace/bugs/add';
+    let tapdUrl = null; // 从 config 读取，不再硬编码
 
     try {
       const result = await chrome.storage.local.get(['config']);
@@ -1056,7 +1069,11 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
     }
 
     // 降级方案：直接打开
-    window.open(tapdUrl, '_blank');
+    if (tapdUrl) {
+      window.open(tapdUrl, '_blank');
+    } else {
+      this.showToast('请先在扩展设置中配置 TAPD 项目 ID', 'warning');
+    }
   }
 
   // ========== 样式 ==========
@@ -1480,6 +1497,13 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
     }
 
     if (this.overlay) {
+      // 移除可能残留的事件监听器
+      this.overlay.removeEventListener('mousedown', this._onMainMouseDown);
+      this.overlay.removeEventListener('mousemove', this._onMainMouseMove);
+      this.overlay.removeEventListener('mouseup', this._onMainMouseUp);
+      this.overlay.removeEventListener('mousedown', this._onRectMouseDown);
+      this.overlay.removeEventListener('mousemove', this._onRectMouseMove);
+      this.overlay.removeEventListener('mouseup', this._onRectMouseUp);
       this.overlay.remove();
       this.overlay = null;
     }

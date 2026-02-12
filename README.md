@@ -4,9 +4,9 @@
   <h3>🚀 一键截图标注，智能缺陷提交</h3>
   <p>专为QA工程师打造的Chrome扩展，实现"一次输入，处处复用"</p>
   
-  ![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v0.1.0-blue?style=flat-square)
+  ![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v0.1.1-blue?style=flat-square)
   ![Manifest V3](https://img.shields.io/badge/Manifest-V3-green?style=flat-square)
-  ![License](https://img.shields.io/badge/License-Internal-red?style=flat-square)
+  ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 </div>
 
 ---
@@ -51,7 +51,7 @@ chrome://extensions/
 ### 首次使用
 
 1. **🔧 检查权限** - 确保扩展已获取必要权限
-2. **📝 配置TAPD** - 访问设置页面，确认TAPD域名配置
+2. **📝 配置TAPD** - 访问设置页面，**填入您的 TAPD 项目 ID** 和域名
 3. **🎯 开始使用** - 在任意页面按 `Alt+S` 启动
 
 ---
@@ -138,43 +138,16 @@ ${issue}（${pathLast1}）
 
 ### 标签分类
 
-<details>
-<summary><b>🔧 功能类（11个）</b></summary>
-
-- 按钮失效、表单校验、数据校验、权限控制
-- 业务逻辑、流程异常、功能缺失、交互异常  
-- 状态管理、消息通知、其他功能
-
-</details>
-
-<details>
-<summary><b>🎨 界面样式类（8个）</b></summary>
-
-- 样式错位、布局问题、颜色异常、字体问题
-- 图标缺失、响应式、动画异常、其他样式
-
-</details>
-
-<details>
-<summary><b>⚡ 性能类（3个）</b></summary>
-
-- 加载缓慢、卡顿问题、内存占用
-
-</details>
-
-<details>
-<summary><b>🔗 兼容性类（4个）</b></summary>
-
-- 浏览器兼容、版本兼容、设备兼容、其他兼容
-
-</details>
-
-<details>
-<summary><b>📡 数据接口类（5个）</b></summary>
-
-- 接口报错、数据异常、请求超时、返回格式、其他接口
-
-</details>
+| 分类 | 标签 |
+|------|------|
+| 🔧 **功能**（5个） | 按钮失效、表单校验、权限错误、跳转异常、功能缺失 |
+| 🎨 **界面样式**（5个） | 样式错位、遮挡层级、适配问题、图标缺失、排版混乱 |
+| 🖱️ **交互体验**（4个） | 点击无响应、提示不清晰、流程阻断、可用性差 |
+| ⚡ **性能**（4个） | 响应慢、页面卡顿、内存泄漏、白屏 |
+| 🔗 **兼容性**（3个） | 浏览器兼容、移动端适配、分辨率适配 |
+| 📡 **数据与接口**（4个） | 接口报错、数据错乱、字段缺失、请求超时 |
+| ✏️ **文案**（3个） | 错别字、翻译错误、术语不一致 |
+| 📦 **其他**（3个） | 其他、复现困难、偶现问题 |
 
 ### 自定义配置
 
@@ -214,29 +187,28 @@ graph TB
 
 ```bash
 bug-shot-turbo/
-├── 📄 manifest.json                 # Manifest V3配置
-├── 📄 CLAUDE.md                     # Claude开发指南
+├── 📄 manifest.json                     # Manifest V3 配置
+├── 📄 README.md                         # 项目说明
+├── 📄 使用说明.md                        # 操作手册
+├── 📄 .gitignore
 ├── 🗂️  background/
-│   └── 📄 service-worker.js         # 后台服务worker
+│   └── 📄 service-worker.js             # 后台服务 worker
 ├── 🗂️  content/
-│   ├── 📄 annotator-outline.js      # 主标注引擎
-│   ├── 📄 annotator-multi.js        # 多区域标注版本
-│   ├── 📄 annotator-border-only.js  # 边框标注版本
-│   ├── 📄 tapd-filler.js           # TAPD自动填充
-│   ├── 📄 tags-renderer.js         # 标签渲染组件
-│   └── 📄 annotator.css            # 标注UI样式
+│   ├── 📄 annotator-rectangle-tool.js   # 矩形标注引擎（核心）
+│   ├── 📄 tapd-filler.js               # TAPD 自动填充
+│   ├── 📄 tags-renderer.js             # 标签渲染组件
+│   └── 📄 annotator.css                # 标注 UI 样式
 ├── 🗂️  config/
-│   ├── 📄 default-tags.js           # 默认标签配置
-│   └── 📄 tags-manager.js           # 标签管理器
+│   ├── 📄 default-tags.js               # 默认标签配置（31个）
+│   └── 📄 tags-manager.js               # 标签管理器
 ├── 🗂️  ui/
-│   ├── 📄 popup.html/js/css         # 扩展弹窗
-│   └── 📄 options.html/js/css       # 设置页面
+│   ├── 📄 popup.html / popup.js / popup.css     # 扩展弹窗
+│   └── 📄 options.html / options.js / options.css # 设置页面
 ├── 🗂️  debug/
-│   ├── 📄 debugging-guide.md        # 调试指南
-│   ├── 📄 test-events.js           # 测试脚本
-│   └── 📄 quick-fix.js             # 快速修复
+│   ├── 📄 debugging-guide.md            # 调试指南
+│   └── 📄 test-events.js               # 测试脚本
 └── 🗂️  assets/
-    └── 🗂️  icons/                   # 扩展图标资源
+    └── 🗂️  icons/                       # 扩展图标资源
 ```
 
 ### 技术栈
@@ -350,6 +322,13 @@ bug-shot-turbo/
 
 ## 📝 更新日志  
 
+### v0.1.1 (2025-02-12)
+- 🔒 **安全加固** - 修复标注文本 XSS 注入风险
+- 🐛 **修复事件泄漏** - 事件监听器未正确移除导致重复激活异常
+- 🔧 **移除硬编码** - 项目 ID 不再写死，需在设置中配置
+- 📦 **配置统一** - 默认配置在各模块间保持一致
+- 📄 **新增 .gitignore** - 防止意外提交编辑器配置
+
 ### v0.1.0 (2025-01-15)
 - 🎉 **首个正式版本发布**
 - ✨ 实现多区域标注功能
@@ -363,9 +342,9 @@ bug-shot-turbo/
 
 ## 📄 许可协议
 
-**内部工具 - 禁止外传**
+本项目已开源，欢迎使用和贡献。
 
-此工具仅供内部团队使用，包含敏感配置信息，请勿对外分享或开源。
+> ⚠️ 使用前请在扩展设置中配置您自己的 TAPD 项目 ID 和域名。
 
 ---
 

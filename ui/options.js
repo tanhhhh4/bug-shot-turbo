@@ -13,19 +13,19 @@ class OptionsManager {
 
   async init() {
     console.log('BST Options: Initializing...');
-    
+
     // 绛夊緟鏍囩绠＄悊鍣ㄥ垵濮嬪寲
     await this.initTagsManager();
-    
+
     // 鍔犺浇褰撳墠閰嶇疆
     await this.loadConfig();
-    
+
     // 鏄剧ず閰嶇疆
     this.displayConfig();
-    
+
     // 缁戝畾浜嬩欢
     this.bindEvents();
-    
+
     console.log('BST Options: Initialized successfully');
   }
 
@@ -59,7 +59,7 @@ class OptionsManager {
   getDefaultConfig() {
     return {
       tapd: {
-        projectIds: ["47910877"],
+        projectIds: [], // 请在设置中配置
         domains: ["tapd.cn", "tapd.tencent.com"]
       },
       selectors: {
@@ -67,11 +67,11 @@ class OptionsManager {
         descIframe: "iframe#BugDescription_ifr, iframe[id*='Description']",
         descBody: "body#tinymce, body.mce-content-body"
       },
-        templates: {
-          title: document.getElementById('titleTemplate').value,
-          description: document.getElementById('descTemplate').value
-        },
-        ai: {
+      templates: {
+        title: document.getElementById('titleTemplate').value,
+        description: document.getElementById('descTemplate').value
+      },
+      ai: {
         enable: false,
         endpoint: "",
         apiKey: "",
@@ -93,7 +93,7 @@ class OptionsManager {
   displayConfig() {
     // 鏄剧ずTAPD椤圭洰閰嶇疆
     this.displayTapdConfig();
-    
+
     // 鏄剧ず鏍囩绠＄悊
     this.displayTagsManagement();
 
@@ -155,7 +155,7 @@ class OptionsManager {
   async renderCategories() {
     const categoriesList = document.getElementById('categoriesList');
     const categories = window.BST_TagsManager.categories || [];
-    
+
     categoriesList.innerHTML = categories.map(category => `
       <div class="category-chip" data-category-id="${category.id}">
         <div class="color-dot" style="background: ${category.color}"></div>
@@ -171,7 +171,7 @@ class OptionsManager {
     const tagUsage = window.BST_TagsManager.getTagUsageStats();
 
     let filteredTags = tags;
-    
+
     // 鎼滅储杩囨护
     if (searchTerm) {
       filteredTags = window.BST_TagsManager.searchTags(searchTerm);
@@ -202,7 +202,7 @@ class OptionsManager {
     tagsList.innerHTML = filteredTags.map(tag => {
       const usage = tagUsage[tag.id] || { count: 0, lastUsedAt: 0 };
       const isSelected = this.selectedTags.has(tag.id);
-      
+
       return `
         <div class="tag-row ${isSelected ? 'selected' : ''}" data-tag-id="${tag.id}">
           <input type="checkbox" class="tag-checkbox" ${isSelected ? 'checked' : ''}>
@@ -241,7 +241,7 @@ class OptionsManager {
     list.innerHTML = data.map((item, index) => this.buildDropdownCard(item, index)).join('');
   }
 
-    buildDropdownCard(item = {}, index = 0) {
+  buildDropdownCard(item = {}, index = 0) {
     const selectors = item.selectors || [];
     const css = selectors.find(s => s.css)?.css || '';
     const xpath = selectors.find(s => s.xpath)?.xpath || '';
@@ -412,7 +412,7 @@ class OptionsManager {
     list.innerHTML = data.map((item, index) => this.buildMenuRuleCard(item, index)).join('');
   }
 
-    buildMenuRuleCard(item = {}, index = 0) {
+  buildMenuRuleCard(item = {}, index = 0) {
     return `
       <div class="menu-rule-card" data-index="${index}">
         <div class="card-row header">
@@ -583,16 +583,16 @@ class OptionsManager {
   }
 
   formatDate(timestamp) {
-    return new Date(timestamp).toLocaleDateString('zh-CN', { 
-      month: 'short', 
-      day: 'numeric' 
+    return new Date(timestamp).toLocaleDateString('zh-CN', {
+      month: 'short',
+      day: 'numeric'
     });
   }
 
   updateStats() {
     const tags = window.BST_TagsManager.getAllTags();
     const categories = new Set(tags.map(tag => tag.category));
-    
+
     document.getElementById('tagsCount').textContent = `总计: ${tags.length} 个标签`;
     document.getElementById('categoriesCount').textContent = `分类: ${categories.size} 个`;
   }
@@ -600,12 +600,12 @@ class OptionsManager {
   bindEvents() {
     // Tab鍒囨崲
     this.bindTabNavigation();
-    
+
     // 淇濆瓨閰嶇疆鎸夐挳
     document.getElementById('saveOptions').addEventListener('click', () => {
       this.saveConfig();
     });
-    
+
     // 閲嶇疆鎸夐挳
     const resetBtn = document.getElementById('resetOptions');
     if (resetBtn) {
@@ -652,31 +652,31 @@ class OptionsManager {
 
     // 鏍囩绠＄悊宸茬Щ闄?
   }
-  
+
   bindTabNavigation() {
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('.option-section');
-    
+
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         const targetSection = tab.dataset.section;
-        
+
         // 绉婚櫎鎵€鏈夋椿鍔ㄧ姸鎬?
         tabs.forEach(t => t.classList.remove('active'));
         sections.forEach(s => s.classList.remove('active'));
-        
+
         // 娣诲姞娲诲姩鐘舵€?
         tab.classList.add('active');
         const section = document.getElementById(`${targetSection}-section`);
         if (section) {
           section.classList.add('active');
         }
-        
+
         // 淇濆瓨褰撳墠鏍囩椤靛埌localStorage
         localStorage.setItem('bst-active-tab', targetSection);
       });
     });
-    
+
     // 鎭㈠涓婃鐨勬爣绛鹃〉
     const lastTab = localStorage.getItem('bst-active-tab');
     if (lastTab) {
@@ -687,12 +687,12 @@ class OptionsManager {
     }
   }
 
-  bindTagsEvents() {}
+  bindTagsEvents() { }
 
   toggleTagSelection(tagId) {
     const checkbox = document.querySelector(`[data-tag-id="${tagId}"] .tag-checkbox`);
     const row = document.querySelector(`[data-tag-id="${tagId}"]`);
-    
+
     if (this.selectedTags.has(tagId)) {
       this.selectedTags.delete(tagId);
       checkbox.checked = false;
@@ -702,14 +702,14 @@ class OptionsManager {
       checkbox.checked = true;
       row.classList.add('selected');
     }
-    
+
     this.updateBatchButtons();
   }
 
   selectAllTags() {
     const allRows = document.querySelectorAll('.tag-row');
     const allSelected = allRows.length > 0 && this.selectedTags.size === allRows.length;
-    
+
     if (allSelected) {
       // 鍙栨秷鍏ㄩ€?
       this.selectedTags.clear();
@@ -726,7 +726,7 @@ class OptionsManager {
         row.querySelector('.tag-checkbox').checked = true;
       });
     }
-    
+
     this.updateBatchButtons();
   }
 
@@ -734,7 +734,7 @@ class OptionsManager {
     const hasSelected = this.selectedTags.size > 0;
     document.getElementById('deleteSelectedTags').disabled = !hasSelected;
     document.getElementById('exportSelectedTags').disabled = !hasSelected;
-    
+
     const selectAllBtn = document.getElementById('selectAllTags');
     const allRows = document.querySelectorAll('.tag-row');
     selectAllBtn.textContent = this.selectedTags.size === allRows.length ? '取消全选' : '全选';
@@ -745,12 +745,12 @@ class OptionsManager {
     const modal = document.getElementById('tagEditModal');
     const title = document.getElementById('modalTitle');
     const deleteBtn = document.getElementById('deleteTagBtn');
-    
+
     if (tagId) {
       const tag = window.BST_TagsManager.getTagById(tagId);
       title.textContent = '缂栬緫鏍囩';
       deleteBtn.style.display = 'block';
-      
+
       document.getElementById('tagName').value = tag.name;
       document.getElementById('tagCategory').value = tag.category;
       document.getElementById('tagColor').value = tag.color;
@@ -759,7 +759,7 @@ class OptionsManager {
     } else {
       title.textContent = '鏂板鏍囩';
       deleteBtn.style.display = 'none';
-      
+
       document.getElementById('tagName').value = '';
       document.getElementById('tagCategory').value = '鍔熻兘';
       document.getElementById('tagColor').value = window.BST_TagsConfig.getNextColor(window.BST_TagsManager.getAllTags());
@@ -781,8 +781,8 @@ class OptionsManager {
   renderCategoryOptions() {
     const select = document.getElementById('tagCategory');
     const categories = window.BST_TagsManager.categories || [];
-    
-    select.innerHTML = categories.map(category => 
+
+    select.innerHTML = categories.map(category =>
       `<option value="${category.name}">${category.name}</option>`
     ).join('');
   }
@@ -790,15 +790,15 @@ class OptionsManager {
   renderColorPresets() {
     const container = document.getElementById('colorPresets');
     const colors = window.BST_TagsConfig.COLOR_PALETTE;
-    
-    container.innerHTML = colors.map(color => 
+
+    container.innerHTML = colors.map(color =>
       `<div class="color-preset" style="background: ${color}" data-color="${color}"></div>`
     ).join('');
   }
 
   selectColorPreset(color) {
     document.getElementById('tagColor').value = color;
-    
+
     // 鏇存柊閫変腑鐘舵€?
     document.querySelectorAll('.color-preset').forEach(preset => {
       preset.classList.remove('selected');
@@ -820,7 +820,7 @@ class OptionsManager {
 
     try {
       const tagData = { name, category, color, hotkey, favorite };
-      
+
       if (this.currentEditingTag) {
         await window.BST_TagsManager.updateTag(this.currentEditingTag, tagData);
       } else {
@@ -837,15 +837,15 @@ class OptionsManager {
 
   async deleteCurrentTag() {
     if (!this.currentEditingTag) return;
-    
+
     if (confirm('确定要删除这个标签吗？')) {
       try {
         await window.BST_TagsManager.deleteTag(this.currentEditingTag);
         this.hideTagEditModal();
         await this.displayTagsManagement();
-      this.showStatus('配置已成功保存', 'success');
+        this.showStatus('配置已成功保存', 'success');
       } catch (error) {
-      alert('请输入标签名称');
+        alert('请输入标签名称');
       }
     }
   }
@@ -866,7 +866,7 @@ class OptionsManager {
         favorite: false
       };
       delete newTag.id;
-      
+
       await window.BST_TagsManager.addTag(newTag);
       await this.displayTagsManagement();
       this.showStatus('配置已成功保存', 'success');
@@ -877,29 +877,29 @@ class OptionsManager {
 
   async deleteSelectedTags() {
     if (this.selectedTags.size === 0) return;
-    
+
     if (confirm("确定要删除选中的  个标签吗？")) {
       try {
-        const deletePromises = Array.from(this.selectedTags).map(tagId => 
+        const deletePromises = Array.from(this.selectedTags).map(tagId =>
           window.BST_TagsManager.deleteTag(tagId)
         );
-        
+
         await Promise.all(deletePromises);
         this.selectedTags.clear();
         await this.displayTagsManagement();
-      this.showStatus('配置已成功保存', 'success');
+        this.showStatus('配置已成功保存', 'success');
       } catch (error) {
-      alert('请输入标签名称');
+        alert('请输入标签名称');
       }
     }
   }
 
   exportSelectedTags() {
     if (this.selectedTags.size === 0) return;
-    
+
     const allTags = window.BST_TagsManager.getAllTags();
     const selectedTagsData = allTags.filter(tag => this.selectedTags.has(tag.id));
-    
+
     const exportData = {
       tagsV2: selectedTagsData,
       exportTime: new Date().toISOString(),
@@ -936,7 +936,7 @@ class OptionsManager {
       }
       saveBtn.innerHTML = '<span class="loading"></span> 保存中...';
       saveBtn.disabled = true;
-      
+
       const newConfig = {
         tapd: {
           projectIds: document.getElementById('tapdProjectIds').value.split(',').map(s => s.trim()).filter(s => s),
@@ -964,35 +964,35 @@ class OptionsManager {
 
       await chrome.storage.local.set({ config: newConfig, dropdownConfigs: newConfig.dropdowns });
       this.config = newConfig;
-      
+
       // 鎭㈠鎸夐挳鐘舵€?
       setTimeout(() => {
         saveBtn.innerHTML = originalText;
         saveBtn.disabled = false;
       }, 1000);
-      
+
       this.showStatus('配置已成功保存', 'success');
     } catch (error) {
       console.error('Save config error:', error);
       this.showStatus('保存失败: ' + error.message, 'error');
-      
+
       // 鎭㈠鎸夐挳鐘舵€?
       const saveBtn = document.getElementById('saveOptions');
       saveBtn.innerHTML = '<span class="btn-icon">💾</span><span class="btn-text">保存设置</span>';
       saveBtn.disabled = false;
     }
   }
-  
+
   async resetConfig() {
     if (confirm('确定要重置所有设置为默认值吗？\n\n此操作将清除所有自定义配置。')) {
       try {
         this.config = this.getDefaultConfig();
         await chrome.storage.local.set({ config: this.config });
         this.displayConfig();
-      this.showStatus('配置已成功保存', 'success');
+        this.showStatus('配置已成功保存', 'success');
       } catch (error) {
         console.error('Reset config error:', error);
-      this.showStatus('保存失败: ' + error.message, 'error');
+        this.showStatus('保存失败: ' + error.message, 'error');
       }
     }
   }
@@ -1022,7 +1022,7 @@ class OptionsManager {
       if (data.tagsV2) {
         const result = await window.BST_TagsManager.importConfig(data);
         if (result.success) {
-      this.showStatus('配置已成功保存', 'success');
+          this.showStatus('配置已成功保存', 'success');
         } else {
           throw new Error(result.error);
         }
@@ -1041,12 +1041,12 @@ class OptionsManager {
         this.config = this.getDefaultConfig();
         await chrome.storage.local.set({ config: this.config });
         await window.BST_TagsManager.resetToDefaults();
-        
+
         this.displayConfig();
-      this.showStatus('配置已成功保存', 'success');
+        this.showStatus('配置已成功保存', 'success');
       } catch (error) {
         console.error('Reset error:', error);
-      this.showStatus('保存失败: ' + error.message, 'error');
+        this.showStatus('保存失败: ' + error.message, 'error');
       }
     }
   }
@@ -1055,11 +1055,11 @@ class OptionsManager {
     if (confirm('确定要清除所有历史记录吗？')) {
       try {
         await chrome.storage.local.remove(['history', 'lastPackage', 'tagUsage']);
-      this.showStatus('配置已成功保存', 'success');
+        this.showStatus('配置已成功保存', 'success');
         await this.displayTagsManagement(); // 鍒锋柊浣跨敤缁熻
       } catch (error) {
         console.error('Clear history error:', error);
-      this.showStatus('保存失败: ' + error.message, 'error');
+        this.showStatus('保存失败: ' + error.message, 'error');
       }
     }
   }
@@ -1078,7 +1078,7 @@ class OptionsManager {
     const status = document.getElementById('saveStatus');
     status.innerHTML = message;
     status.className = `save-status ${type} show`;
-    
+
     // 鑷姩闅愯棌
     clearTimeout(this.statusTimeout);
     this.statusTimeout = setTimeout(() => {

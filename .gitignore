@@ -1,0 +1,21 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# AI assistant config
+.claude/
+
+# Node (if added later)
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+*.zip
