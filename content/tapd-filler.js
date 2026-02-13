@@ -8,6 +8,13 @@ class TapdAutoFiller {
     this.maxRetries = 10;
     this.dropdownConfigs = [];
     this.hasFilled = false;
+    this.isChecking = false;
+    this.isFilling = false;
+    this.processingBugId = null;
+    this.lastCompletedBugId = null;
+    this.checkTimers = [];
+    this.aiCopywritingCache = new Map();
+    this.aiDropdownCache = new Map();
 
     this.init();
   }
@@ -20,23 +27,9 @@ class TapdAutoFiller {
     // 检查是否是TAPD新建缺陷页面
     if (this.isTapdNewBugPage()) {
       console.log('BST TAPD Filler: TAPD new bug page detected, waiting for page load...');
-      // 延迟执行，等待页面完全加载，增加等待时间
-      setTimeout(() => {
-        console.log('BST TAPD Filler: First attempt to check for pending bug data...');
-        this.checkAndFill();
-      }, 2000);
-
-      // 再次尝试，以防第一次失败
-      setTimeout(() => {
-        console.log('BST TAPD Filler: Second attempt to check for pending bug data...');
-        this.checkAndFill();
-      }, 4000);
-
-      // 第三次尝试，给更多时间加载
-      setTimeout(() => {
-        console.log('BST TAPD Filler: Third attempt to check for pending bug data...');
-        this.checkAndFill();
-      }, 6000);
+      this.scheduleCheck(2000, 'First');
+      this.scheduleCheck(4000, 'Second');
+      this.scheduleCheck(6000, 'Third');
     }
 
     // 监听页面变化（SPA路由切换）
@@ -121,6 +114,19 @@ class TapdAutoFiller {
     });
   }
 
+  scheduleCheck(delayMs, label) {
+    const timerId = setTimeout(() => {
+      console.log(`BST TAPD Filler: ${label} attempt to check for pending bug data...`);
+      this.checkAndFill();
+    }, delayMs);
+    this.checkTimers.push(timerId);
+  }
+
+  clearScheduledChecks() {
+    this.checkTimers.forEach(id => clearTimeout(id));
+    this.checkTimers = [];
+  }
+
   // 调试函数：手动测试页面检测
   testPageDetection() {
     console.log('BST TAPD Filler: Manual test started');
@@ -152,9 +158,10 @@ class TapdAutoFiller {
   }
 
   async checkAndFill() {
-    if (this.hasFilled) {
+    if (this.hasFilled || this.isChecking) {
       return;
     }
+    this.isChecking = true;
     try {
       console.log('BST TAPD Filler: Requesting bug data from background...');
       // 获取待填充的数据
@@ -166,8 +173,25 @@ class TapdAutoFiller {
 
       if (response && response.success && response.data) {
         console.log('BST TAPD Filler: Bug data received:', response.data);
+        const bugId = response.data.id;
+        if (!bugId) {
+          console.log('BST TAPD Filler: Missing bug id, skip');
+          return;
+        }
+        if (this.lastCompletedBugId === bugId) {
+          console.log('BST TAPD Filler: Bug already completed, skip', bugId);
+          return;
+        }
+        if (this.processingBugId === bugId && this.retryCount > 0) {
+          console.log('BST TAPD Filler: Bug is waiting for retry, skip duplicate check', bugId);
+          return;
+        }
+        if (this.isFilling && this.processingBugId === bugId) {
+          console.log('BST TAPD Filler: Bug is currently being filled, skip', bugId);
+          return;
+        }
         this.bugData = response.data;
-        await this.autoFill();
+        await this.autoFill(bugId);
       } else {
         console.log('BST TAPD Filler: No pending bug data found');
         if (response && !response.success) {
@@ -176,13 +200,22 @@ class TapdAutoFiller {
       }
     } catch (error) {
       console.error('BST TAPD Filler: Check and fill error:', error);
+    } finally {
+      this.isChecking = false;
     }
   }
 
-  async autoFill() {
+  async autoFill(bugId) {
+    if (this.isFilling) {
+      console.log('BST TAPD Filler: autoFill is already running, skip');
+      return;
+    }
+
+    this.isFilling = true;
+    this.processingBugId = bugId || this.bugData?.id || null;
     try {
       // === AI 文案优化 ===
-      const aiCopywriting = await this.fetchAiCopywriting().catch(e => {
+      const aiCopywriting = await this.fetchAiCopywritingCached(this.processingBugId).catch(e => {
         console.log('BST TAPD Filler: AI copywriting failed, using original text', e?.message);
         return null;
       });
@@ -237,12 +270,16 @@ class TapdAutoFiller {
       }
 
       // 根据描述尝试自动匹配下拉
-      await this.autoSelectDropdowns(description);
+      await this.autoSelectDropdowns(description, this.processingBugId);
 
       if (titleFilled && descFilled) {
         // 显示成功提示
         const aiHint = aiCopywriting ? '（AI 已优化文案）' : '';
         this.showToast(`缺陷信息已自动填充${aiHint}，截图已尝试自动插入；如未显示可手动粘贴（Ctrl/Cmd+V）`, 'success');
+
+        this.lastCompletedBugId = this.processingBugId;
+        this.retryCount = 0;
+        this.clearScheduledChecks();
 
         // 尝试聚焦到描述框，方便用户粘贴图片
         this.focusDescriptionField();
@@ -250,8 +287,9 @@ class TapdAutoFiller {
         // 重试机制
         if (this.retryCount < this.maxRetries) {
           this.retryCount++;
+          const currentBugId = this.processingBugId;
           setTimeout(() => {
-            this.autoFill();
+            this.autoFill(currentBugId);
           }, 500);
         } else {
           this.showToast('自动填充失败，请手动填写', 'error');
@@ -260,6 +298,8 @@ class TapdAutoFiller {
     } catch (error) {
       console.error('Auto fill error:', error);
       this.showToast('自动填充出错：' + error.message, 'error');
+    } finally {
+      this.isFilling = false;
     }
   }
 
@@ -476,7 +516,7 @@ class TapdAutoFiller {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async autoSelectDropdowns(description) {
+  async autoSelectDropdowns(description, bugId = '') {
     const configs = this.dropdownConfigs || [];
     if (!configs.length) return;
 
@@ -490,7 +530,12 @@ class TapdAutoFiller {
     const normalizedDesc = this.normalizeText(combinedText);
 
     // AI 预选
-    this.aiDropdownSuggestions = await this.fetchAiDropdownSuggestions(configs, rectTexts, tagText).catch(() => ({})) || {};
+    this.aiDropdownSuggestions = await this.fetchAiDropdownSuggestionsCached(
+      bugId,
+      configs,
+      rectTexts,
+      tagText
+    ).catch(() => ({})) || {};
 
     for (const cfg of configs) {
       try {
@@ -600,7 +645,14 @@ class TapdAutoFiller {
         signal: controller.signal
       });
       clearTimeout(timer);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
       const data = await res.json();
+      if (data?.error) {
+        throw new Error(data.error?.message || 'AI provider returned error');
+      }
       console.log('BST TAPD Filler: AI response raw', data);
 
       const content = data?.choices?.[0]?.message?.content || '';
@@ -621,6 +673,17 @@ class TapdAutoFiller {
       console.log('BST TAPD Filler: AI request failed', { error: error?.message, timeoutMs });
       return {};
     }
+  }
+
+  async fetchAiDropdownSuggestionsCached(bugId, configs, rectTexts, tagText) {
+    if (bugId && this.aiDropdownCache.has(bugId)) {
+      return this.aiDropdownCache.get(bugId);
+    }
+    const result = await this.fetchAiDropdownSuggestions(configs, rectTexts, tagText);
+    if (bugId && result && Object.keys(result).length > 0) {
+      this.aiDropdownCache.set(bugId, result || {});
+    }
+    return result || {};
   }
 
   /**
@@ -691,7 +754,14 @@ class TapdAutoFiller {
         signal: controller.signal
       });
       clearTimeout(timer);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
       const data = await res.json();
+      if (data?.error) {
+        throw new Error(data.error?.message || 'AI provider returned error');
+      }
       console.log('BST TAPD Filler: AI copywriting response raw', data);
 
       const content = data?.choices?.[0]?.message?.content || '';
@@ -719,6 +789,17 @@ class TapdAutoFiller {
       console.log('BST TAPD Filler: AI copywriting request failed', { error: error?.message, timeoutMs });
       return null;
     }
+  }
+
+  async fetchAiCopywritingCached(bugId) {
+    if (bugId && this.aiCopywritingCache.has(bugId)) {
+      return this.aiCopywritingCache.get(bugId);
+    }
+    const result = await this.fetchAiCopywriting();
+    if (bugId && result) {
+      this.aiCopywritingCache.set(bugId, result);
+    }
+    return result;
   }
 
   findElementBySelectors(selectors = []) {
