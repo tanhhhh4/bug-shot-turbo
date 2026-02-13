@@ -269,7 +269,10 @@ class TapdAutoFiller {
         await chrome.runtime.sendMessage({ action: 'clearBugData' });
       }
 
-      // 根据描述尝试自动匹配下拉
+      // 特殊字段：按顺序处理（处理人 -> 迭代），各字段仅尝试一次
+      await this.autoFillSpecialFieldsInOrder();
+
+      // 根据描述尝试自动匹配下拉（跳过特殊字段）
       await this.autoSelectDropdowns(description, this.processingBugId);
 
       if (titleFilled && descFilled) {
@@ -538,6 +541,9 @@ class TapdAutoFiller {
     ).catch(() => ({})) || {};
 
     for (const cfg of configs) {
+      if (this.isSpecialDropdownName(cfg?.name)) {
+        continue;
+      }
       try {
         const aiValue = this.aiDropdownSuggestions?.[cfg.name];
         await this.autoSelectOneDropdown(cfg, normalizedDesc, aiValue);
@@ -545,6 +551,159 @@ class TapdAutoFiller {
         console.log('BST TAPD Filler: dropdown auto-select error', cfg?.name || '', e);
       }
     }
+  }
+
+  async autoFillSpecialFieldsInOrder() {
+    await this.autoFillSpecialAssignee();
+    await this.autoFillSpecialIteration();
+  }
+
+  async autoFillSpecialAssignee() {
+    const keyword = (this.bugData?.assignee || '').trim();
+    if (!keyword) {
+      console.log('BST TAPD Filler: special assignee empty, skip');
+      return false;
+    }
+
+    const input = this.findFirstElement([
+      '#BugCurrentOwnerValue',
+      "[data-field-name='current_owner'] input#BugCurrentOwnerValue",
+      "[data-field-name='current_owner'] input[type='text'][data-control='pinyinuserchooser']",
+      "[data-field-name='current_owner'] input[type='text']",
+      "input[id*='CurrentOwner'][type='text']"
+    ]);
+
+    if (!input) {
+      console.log('BST TAPD Filler: special assignee input not found');
+      return false;
+    }
+
+    this.setInputValue(input, keyword);
+    const picked = await this.pickFirstVisibleSuggestion([
+      '.tt-menu .tt-suggestion',
+      '.tt-dropdown-menu .tt-suggestion',
+      '.twitter-typeahead .tt-suggestion'
+    ]);
+
+    console.log('BST TAPD Filler: special assignee result', { keyword, picked });
+    return picked;
+  }
+
+  async autoFillSpecialIteration() {
+    const keyword = (this.bugData?.iteration || '').trim();
+    if (!keyword) {
+      console.log('BST TAPD Filler: special iteration empty, skip');
+      return false;
+    }
+
+    const container = document.querySelector("[data-field-name='iteration_id']");
+    const input = this.findFirstElement([
+      '#BugIterationIdValue',
+      "[data-field-name='iteration_id'] input[type='text']",
+      "input[id*='Iteration'][type='text']"
+    ]);
+
+    if (input) {
+      this.setInputValue(input, keyword);
+      const picked = await this.pickFirstVisibleSuggestion([
+        '.tt-menu .tt-suggestion',
+        '.tt-dropdown-menu .tt-suggestion',
+        '.twitter-typeahead .tt-suggestion',
+        '.select2-results__option[aria-selected]',
+        '.ui-autocomplete li',
+        '.autocomplete-suggestion'
+      ]);
+      console.log('BST TAPD Filler: special iteration typeahead result', { keyword, picked });
+      return picked;
+    }
+
+    const selectEl = container?.querySelector?.('select');
+    if (!selectEl) {
+      console.log('BST TAPD Filler: special iteration input/select not found');
+      return false;
+    }
+
+    const options = this.collectNativeOptions(selectEl);
+    const normKeyword = this.normalizeText(keyword);
+    const matchedOptions = options.filter(o => (
+      (o.normalizedText && o.normalizedText.includes(normKeyword)) ||
+      (o.value && this.normalizeText(o.value).includes(normKeyword))
+    ));
+
+    if (!matchedOptions.length) {
+      console.log('BST TAPD Filler: special iteration no native match', { keyword });
+      return false;
+    }
+
+    this.applyNativeSelection(selectEl, matchedOptions[0]);
+    console.log('BST TAPD Filler: special iteration native result', {
+      keyword,
+      value: matchedOptions[0].value
+    });
+    return true;
+  }
+
+  isElementVisible(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  async pickFirstVisibleSuggestion(selectors = []) {
+    for (let i = 0; i < 8; i += 1) {
+      for (const selector of selectors) {
+        const items = Array.from(document.querySelectorAll(selector));
+        const firstVisible = items.find(el => this.isElementVisible(el));
+        if (firstVisible) {
+          firstVisible.click();
+          return true;
+        }
+      }
+      await this.delay(120);
+    }
+    return false;
+  }
+
+  findFirstElement(selectors = []) {
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  setInputValue(input, value) {
+    if (!input) return;
+
+    input.focus();
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    if (setter) {
+      setter.call(input, value);
+    } else {
+      input.value = value;
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  }
+
+  isSpecialDropdownName(name = '') {
+    return this.isAssigneeDropdownName(name) || this.isIterationDropdownName(name);
+  }
+
+  isAssigneeDropdownName(name = '') {
+    const normalizedName = this.normalizeText(name);
+    return ['处理人', '负责人', '当前处理人', 'owner', 'current_owner']
+      .some(alias => normalizedName.includes(this.normalizeText(alias)));
+  }
+
+  isIterationDropdownName(name = '') {
+    const normalizedName = this.normalizeText(name);
+    return ['迭代', 'iteration', 'sprint', 'iteration_id']
+      .some(alias => normalizedName.includes(this.normalizeText(alias)));
   }
 
   async autoSelectOneDropdown(cfg, normalizedDesc, aiValue) {
@@ -584,16 +743,10 @@ class TapdAutoFiller {
     const fieldName = (name || '').trim();
     if (!fieldName) return '';
 
-    const normalize = (s) => (s || '').toString().trim().toLowerCase();
-    const normalizedName = normalize(fieldName);
-
-    const assigneeAliases = ['处理人', '负责人', '当前处理人', 'owner', 'current_owner'];
-    if (assigneeAliases.some(alias => normalizedName.includes(normalize(alias)))) {
+    if (this.isAssigneeDropdownName(fieldName)) {
       return (this.bugData?.assignee || '').trim();
     }
-
-    const iterationAliases = ['迭代', 'iteration', 'sprint', 'iteration_id'];
-    if (iterationAliases.some(alias => normalizedName.includes(normalize(alias)))) {
+    if (this.isIterationDropdownName(fieldName)) {
       return (this.bugData?.iteration || '').trim();
     }
 
