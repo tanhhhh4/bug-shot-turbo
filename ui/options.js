@@ -33,7 +33,7 @@ class OptionsManager {
     if (window.BST_TagsManager) {
       await window.BST_TagsManager.init();
     } else {
-      console.error('BST Options: TagsManager not found');
+      console.log('BST Options: TagsManager disabled on options page');
     }
   }
 
@@ -597,11 +597,16 @@ class OptionsManager {
   }
 
   updateStats() {
+    if (!window.BST_TagsManager) return;
+    const tagsCountEl = document.getElementById('tagsCount');
+    const categoriesCountEl = document.getElementById('categoriesCount');
+    if (!tagsCountEl || !categoriesCountEl) return;
+
     const tags = window.BST_TagsManager.getAllTags();
     const categories = new Set(tags.map(tag => tag.category));
 
-    document.getElementById('tagsCount').textContent = `总计: ${tags.length} 个标签`;
-    document.getElementById('categoriesCount').textContent = `分类: ${categories.size} 个`;
+    tagsCountEl.textContent = `总计: ${tags.length} 个标签`;
+    categoriesCountEl.textContent = `分类: ${categories.size} 个`;
   }
 
   bindEvents() {
@@ -1014,9 +1019,11 @@ class OptionsManager {
   exportConfig() {
     const exportData = {
       config: this.config,
-      ...window.BST_TagsManager.exportConfig(),
       exportTime: new Date().toISOString()
     };
+    if (window.BST_TagsManager) {
+      Object.assign(exportData, window.BST_TagsManager.exportConfig());
+    }
 
     this.downloadJSON(exportData, `bug-shot-turbo-config-${new Date().toISOString().split('T')[0]}.json`);
   }
@@ -1033,7 +1040,7 @@ class OptionsManager {
         await chrome.storage.local.set({ config: this.config });
       }
 
-      if (data.tagsV2) {
+      if (data.tagsV2 && window.BST_TagsManager) {
         const result = await window.BST_TagsManager.importConfig(data);
         if (result.success) {
           this.showStatus('配置已成功保存', 'success');
@@ -1054,7 +1061,9 @@ class OptionsManager {
       try {
         this.config = this.getDefaultConfig();
         await chrome.storage.local.set({ config: this.config });
-        await window.BST_TagsManager.resetToDefaults();
+        if (window.BST_TagsManager) {
+          await window.BST_TagsManager.resetToDefaults();
+        }
 
         this.displayConfig();
         this.showStatus('配置已成功保存', 'success');
@@ -1070,7 +1079,7 @@ class OptionsManager {
       try {
         await chrome.storage.local.remove(['history', 'lastPackage', 'tagUsage']);
         this.showStatus('配置已成功保存', 'success');
-        await this.displayTagsManagement(); // 刷新使用统计
+        await this.displayTagsManagement(); // 标签管理启用时刷新使用统计
       } catch (error) {
         console.error('Clear history error:', error);
         this.showStatus('保存失败: ' + error.message, 'error');

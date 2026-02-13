@@ -202,23 +202,6 @@ class BackgroundService {
         lastUpdateTime: Date.now()
       });
 
-      // 更新历史记录
-      const result = await chrome.storage.local.get(['history']);
-      let history = result.history || [];
-      history.unshift(data);
-
-      // 保留最近10条
-      if (history.length > 10) {
-        history = history.slice(0, 10);
-      }
-
-      await chrome.storage.local.set({ history });
-
-      // 更新统计数据
-      const metrics = await this.getMetrics();
-      metrics.totalBugs++;
-      await chrome.storage.local.set({ metrics });
-
       sendResponse({ success: true, data });
     } catch (error) {
       console.error('Save bug data failed:', error);
@@ -258,15 +241,6 @@ class BackgroundService {
       if (result.lastPackage && result.lastPackage.id === id) {
         result.lastPackage.status = status;
         await chrome.storage.local.set({ lastPackage: result.lastPackage });
-      }
-
-      // 更新历史记录中的状态
-      if (result.history) {
-        const index = result.history.findIndex(item => item.id === id);
-        if (index !== -1) {
-          result.history[index].status = status;
-          await chrome.storage.local.set({ history: result.history });
-        }
       }
 
       // 更新统计数据

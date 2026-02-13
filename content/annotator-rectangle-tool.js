@@ -970,11 +970,13 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
           ctx.lineWidth = 2 * dpr;
           ctx.strokeRect(relX, relY, relW, relH);
 
-          // 绘制编号标签
+          // 绘制编号标签（带边界 clamp）
           const labelSize = 24 * dpr;
+          const labelCx = Math.max(labelSize / 2, Math.min(relX + labelSize / 2, canvas.width - labelSize / 2));
+          const labelCy = Math.max(labelSize / 2, relY - labelSize / 2);
           ctx.fillStyle = '#1aad19';
           ctx.beginPath();
-          ctx.arc(relX + labelSize / 2, relY - labelSize / 2, labelSize / 2, 0, Math.PI * 2);
+          ctx.arc(labelCx, labelCy, labelSize / 2, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.strokeStyle = 'white';
@@ -985,16 +987,36 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
           ctx.font = `bold ${12 * dpr}px Arial`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(rect.order.toString(), relX + labelSize / 2, relY - labelSize / 2);
+          ctx.fillText(rect.order.toString(), labelCx, labelCy);
 
-          // 绘制文字标签
-          ctx.fillStyle = 'rgba(26, 173, 25, 0.9)';
-          ctx.font = `${12 * dpr}px Arial`;
+          // 绘制文字标签（加大字号 + 边界 clamp）
+          const fontSize = 16 * dpr;
+          const textPadding = 10 * dpr;
+          const textHeight = fontSize + textPadding;
+          ctx.font = `bold ${fontSize}px Arial`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
           const textWidth = ctx.measureText(rect.text).width;
-          ctx.fillRect(relX, relY + relH + 2 * dpr, textWidth + 16 * dpr, 20 * dpr);
+          const totalTextW = textWidth + textPadding * 2;
+
+          // x 方向：不超出 canvas 右边界
+          let textBgX = relX;
+          if (textBgX + totalTextW > canvas.width) {
+            textBgX = Math.max(0, canvas.width - totalTextW);
+          }
+
+          // y 方向：默认在矩形下方，超出 canvas 底部则改到矩形上方
+          let textBgY = relY + relH + 2 * dpr;
+          if (textBgY + textHeight > canvas.height) {
+            textBgY = relY - textHeight - 2 * dpr;
+            if (textBgY < 0) textBgY = 0;
+          }
+
+          ctx.fillStyle = 'rgba(26, 173, 25, 0.9)';
+          ctx.fillRect(textBgX, textBgY, totalTextW, textHeight);
 
           ctx.fillStyle = 'white';
-          ctx.fillText(rect.text, relX + 8 * dpr, relY + relH + 12 * dpr);
+          ctx.fillText(rect.text, textBgX + textPadding, textBgY + textHeight / 2);
         });
 
         this.bugData.screenshot = canvas.toDataURL('image/png');

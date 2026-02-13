@@ -205,6 +205,15 @@ class TapdAutoFiller {
             text: aiCopywriting.descriptions[i] || r.text
           }));
         }
+
+        // 新变量：AI 生成的详细描述（模板变量 ${aiDetail}）
+        if (typeof aiCopywriting.detail === 'string' && aiCopywriting.detail.trim()) {
+          renderData.aiDetail = aiCopywriting.detail.trim();
+        } else if (Array.isArray(aiCopywriting.descriptions) && aiCopywriting.descriptions.length > 0) {
+          renderData.aiDetail = aiCopywriting.descriptions
+            .map((text, i) => `${i + 1}、${text}`)
+            .join('\n');
+        }
       }
 
       // 渲染模板
@@ -267,6 +276,15 @@ class TapdAutoFiller {
       // 特殊处理多区域的问题描述
       if (key === 'issue' && data.issuesSummary) {
         return data.issuesSummary;
+      }
+
+      // 新变量：AI 详细描述，AI 不可用时降级到 issue/rectangleList
+      if (key === 'aiDetail') {
+        if (data.aiDetail) return data.aiDetail;
+        if (data.rectangles && Array.isArray(data.rectangles) && data.rectangles.length > 0) {
+          return data.rectangles.map(r => `${r.order}、${r.text}`).join('\n');
+        }
+        return data.issuesSummary || data.issue || '';
       }
 
       // 处理矩形标注列表（新功能）
@@ -540,6 +558,7 @@ class TapdAutoFiller {
       '1. 每个下拉只能从提供的候选中选 1 个；',
       '2. 返回 JSON，键是下拉名称，值是候选中的一个；',
       '3. 不要输出多余文字。',
+      '4. 严重程度方面，除非描述中明确涉及数据丢失、系统崩溃、安全漏洞等极其严重的问题，否则不要选择"致命"。',
       '',
       '候选列表：',
       ...dropdownBlocks.map(d => `- ${d.name}: [${d.candidates.join(', ')}]`),
@@ -607,7 +626,7 @@ class TapdAutoFiller {
   /**
    * AI 文案优化：对用户输入的问题描述进行规范化润色
    * 规则：不臆想、不无中生有，保留编号结构
-   * @returns {Promise<{title: string, descriptions: string[]}|null>}
+   * @returns {Promise<{title: string, descriptions: string[], detail?: string}|null>}
    */
   async fetchAiCopywriting() {
     const ai = this.config?.ai;
@@ -636,10 +655,11 @@ class TapdAutoFiller {
       '1. 仅对用户输入的问题描述进行规范化润色，使表达更专业清晰；',
       '2. 绝对不要添加用户没有提到的信息，不要臆想、不要无中生有；',
       '3. 如果用户输入包含多条（如 1、xxx  2、xxx），必须逐条保留编号并分别优化，不要合并；',
-      '4. 返回 JSON 格式：{"title": "优化后的简洁标题", "descriptions": ["优化后的描述1", "优化后的描述2"]}',
+      '4. 返回 JSON 格式：{"title": "优化后的简洁标题", "descriptions": ["优化后的描述1", "优化后的描述2"], "detail": "整合后的详细描述"}',
       '5. title 应该简洁概括所有问题，不超过 30 字；',
       '6. descriptions 数组的长度必须和输入的条目数完全一致；',
-      '7. 不要输出 JSON 以外的任何文字。',
+      '7. detail 需要是可直接贴到缺陷单里的完整详细描述；',
+      '8. 不要输出 JSON 以外的任何文字。',
       '',
       `问题标签：${tagText || '（无）'}`,
       '',
