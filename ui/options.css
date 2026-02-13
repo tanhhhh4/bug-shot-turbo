@@ -30,6 +30,19 @@ body {
   padding: 1.5rem;
 }
 
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .brand-name {
   font-size: 1.25rem;
   font-weight: 700;

@@ -1,5 +1,9 @@
 # 缺陷快照助手
 
+<div align="center">
+  <img src="./assets/logo/logo.png" alt="缺陷快照助手 Logo" width="120" />
+</div>
+
 一个面向 TAPD 的 Chrome 扩展：在业务页面截图标注并生成缺陷内容，自动跳转到 TAPD 新建页完成标题/描述和下拉字段填充。
 
 ## 当前功能
