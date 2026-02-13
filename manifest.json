@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Bug Shot Turbo (for TAPD)",
+  "name": "缺陷快照助手",
   "version": "0.1.0",
   "description": "一次输入，处处复用 - 极速提交TAPD缺陷",
   
