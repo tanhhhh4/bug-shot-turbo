@@ -275,6 +275,9 @@ class TapdAutoFiller {
       // 根据描述尝试自动匹配下拉（跳过特殊字段）
       await this.autoSelectDropdowns(description, this.processingBugId);
 
+      // 所有自动选择动作结束后，尝试收起可能残留的下拉面板
+      await this.collapseDropdownPanels();
+
       if (titleFilled && descFilled) {
         // 显示成功提示
         const aiHint = aiCopywriting ? '（AI 已优化文案）' : '';
@@ -1108,6 +1111,31 @@ class TapdAutoFiller {
     const target = document.elementFromPoint(centerX, centerY);
     if (target) {
       target.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: centerX, clientY: centerY }));
+    }
+  }
+
+  async collapseDropdownPanels() {
+    try {
+      const assigneeRow = document.querySelector("[data-field-name='current_owner']");
+      const blankTarget = assigneeRow?.querySelector?.('.controls')
+        || assigneeRow
+        || document.querySelector("[data-field-name='priority']")
+        || document.body;
+
+      if (blankTarget) {
+        blankTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        blankTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        blankTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      await this.delay(80);
+      document.body?.click?.();
+    } catch (e) {
+      console.log('BST TAPD Filler: collapse dropdown panels failed', e);
     }
   }
 
