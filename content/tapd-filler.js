@@ -554,7 +554,7 @@ class TapdAutoFiller {
     const type = cfg.type || (element && element.tagName === 'SELECT' ? 'native' : 'custom');
 
     const mappingHit = this.matchByMapping(normalizedDesc, cfg.mapping);
-    const manualValue = aiValue || this.bugData?.dropdownValue?.trim();
+    const manualValue = this.getManualDropdownValue(cfg.name) || aiValue || this.bugData?.dropdownValue?.trim();
 
     if (type === 'native' && element && element.tagName === 'SELECT') {
       const options = this.collectNativeOptions(element);
@@ -578,6 +578,26 @@ class TapdAutoFiller {
     if (!targetOption || !targetOption.el) return;
 
     targetOption.el.click();
+  }
+
+  getManualDropdownValue(name = '') {
+    const fieldName = (name || '').trim();
+    if (!fieldName) return '';
+
+    const normalize = (s) => (s || '').toString().trim().toLowerCase();
+    const normalizedName = normalize(fieldName);
+
+    const assigneeAliases = ['处理人', '负责人', '当前处理人', 'owner', 'current_owner'];
+    if (assigneeAliases.some(alias => normalizedName.includes(normalize(alias)))) {
+      return (this.bugData?.assignee || '').trim();
+    }
+
+    const iterationAliases = ['迭代', 'iteration', 'sprint', 'iteration_id'];
+    if (iterationAliases.some(alias => normalizedName.includes(normalize(alias)))) {
+      return (this.bugData?.iteration || '').trim();
+    }
+
+    return '';
   }
 
   async fetchAiDropdownSuggestions(configs, rectTexts, tagText) {

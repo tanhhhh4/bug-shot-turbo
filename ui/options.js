@@ -48,6 +48,7 @@ class OptionsManager {
       // Ensure critical nested objects exist
       this.config.tapd = { ...defaultConfig.tapd, ...(this.config.tapd || {}) };
       this.config.selectors = { ...defaultConfig.selectors, ...(this.config.selectors || {}) };
+      this.config.specialOptions = { ...defaultConfig.specialOptions, ...(this.config.specialOptions || {}) };
       this.config.templates = { ...defaultConfig.templates, ...(this.config.templates || {}) };
       this.config.ai = { ...defaultConfig.ai, ...(this.config.ai || {}) };
 
@@ -73,6 +74,10 @@ class OptionsManager {
         title: "input#BugTitle, input[name='data[Bug][title]']",
         descIframe: "iframe#BugDescription_ifr, iframe[id*='Description']",
         descBody: "body#tinymce, body.mce-content-body"
+      },
+      specialOptions: {
+        assignees: [],
+        iterations: []
       },
       templates: {
         title: "${issue}（${pathLast1}）",
@@ -123,9 +128,18 @@ class OptionsManager {
     document.getElementById('titleSelector').value = this.config.selectors.title;
     document.getElementById('descIframeSelector').value = this.config.selectors.descIframe;
     document.getElementById('descBodySelector').value = this.config.selectors.descBody;
+    document.getElementById('assigneeOptions').value = (this.config.specialOptions?.assignees || []).join('\n');
+    document.getElementById('iterationOptions').value = (this.config.specialOptions?.iterations || []).join('\n');
     document.getElementById('titleTemplate').value = this.config.templates.title;
     document.getElementById('descTemplate').value = this.config.templates.description;
     this.renderDropdowns();
+  }
+
+  parseLineOptions(text = '') {
+    return text
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
   }
 
   displayAiConfig() {
@@ -965,6 +979,10 @@ class OptionsManager {
           title: document.getElementById('titleSelector').value,
           descIframe: document.getElementById('descIframeSelector').value,
           descBody: document.getElementById('descBodySelector').value
+        },
+        specialOptions: {
+          assignees: this.parseLineOptions(document.getElementById('assigneeOptions')?.value || ''),
+          iterations: this.parseLineOptions(document.getElementById('iterationOptions')?.value || '')
         },
         templates: {
           title: document.getElementById('titleTemplate').value,

@@ -34,6 +34,8 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
       rectangles: [],
       pageURL: '',
       timestamp: '',
+      assignee: '',
+      iteration: '',
       secondMenuName: '',
       secondMenus: []
     };
@@ -709,10 +711,36 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
     }
 
     // 显示最终输入面板
-    this.showFinalInputPanel();
+    await this.showFinalInputPanel();
   }
 
-  showFinalInputPanel() {
+  async loadSpecialOptions() {
+    try {
+      const result = await chrome.storage.local.get(['config']);
+      const special = result.config?.specialOptions || {};
+      return {
+        assignees: Array.isArray(special.assignees) ? special.assignees : [],
+        iterations: Array.isArray(special.iterations) ? special.iterations : []
+      };
+    } catch (error) {
+      console.warn('BST: Failed to load special options:', error);
+      return { assignees: [], iterations: [] };
+    }
+  }
+
+  renderSelectOptions(list = [], currentValue = '') {
+    const options = ['<option value="">请选择</option>'];
+    list.forEach(item => {
+      const value = (item || '').trim();
+      if (!value) return;
+      const selected = value === currentValue ? ' selected' : '';
+      options.push(`<option value="${this.escapeHTML(value)}"${selected}>${this.escapeHTML(value)}</option>`);
+    });
+    return options.join('');
+  }
+
+  async showFinalInputPanel() {
+    const specialOptions = await this.loadSpecialOptions();
     const panel = document.createElement('div');
     panel.className = 'bst-final-panel';
     panel.innerHTML = `
@@ -735,11 +763,15 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
           </div>
           <div class="bst-final-input">
             <label>处理人</label>
-            <input type="text" id="bst-assignee" placeholder="请输入处理人，如：张三">
+            <select id="bst-assignee" class="bst-final-select">
+              ${this.renderSelectOptions(specialOptions.assignees, this.bugData.assignee)}
+            </select>
           </div>
           <div class="bst-final-input">
             <label>迭代</label>
-            <input type="text" id="bst-iteration" placeholder="请输入迭代，如：迭代名称">
+            <select id="bst-iteration" class="bst-final-select">
+              ${this.renderSelectOptions(specialOptions.iterations, this.bugData.iteration)}
+            </select>
           </div>
         </div>
         <div class="bst-final-footer">
@@ -894,6 +926,9 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
   }
 
   async submitBugData(panel) {
+    this.bugData.assignee = panel.querySelector('#bst-assignee')?.value?.trim() || '';
+    this.bugData.iteration = panel.querySelector('#bst-iteration')?.value?.trim() || '';
+
     // 自动生成 issue：所有矩形框描述按 "1、2、3、" 格式
     this.bugData.issue = this.rectangles.map(r => `${r.order}、${r.text}`).join(' ');
     this.bugData.pageURL = window.location.href;
@@ -1411,7 +1446,12 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
         margin-bottom: 8px;
       }
 
-      .bst-final-input input {
+      .bst-final-input {
+        margin-bottom: 12px;
+      }
+
+      .bst-final-input input,
+      .bst-final-input select {
         width: 100%;
         padding: 8px 12px;
         border: 1px solid #d9d9d9;
@@ -1423,7 +1463,8 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
         user-select: text !important;
       }
 
-      .bst-final-input input:focus {
+      .bst-final-input input:focus,
+      .bst-final-input select:focus {
         outline: none;
         border-color: #1aad19;
       }
@@ -1575,6 +1616,8 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
       rectangles: [],
       pageURL: '',
       timestamp: '',
+      assignee: '',
+      iteration: '',
       secondMenuName: '',
       secondMenus: []
     };
