@@ -784,6 +784,13 @@ class TapdAutoFiller {
       return false;
     }
 
+    // TAPD 新版处理人控件（tapd-userselect-v2）
+    const v2Picked = await this.autoFillSpecialAssigneeV2(keyword);
+    if (v2Picked) {
+      console.log('BST TAPD Filler: special assignee v2 result', { keyword, picked: true });
+      return true;
+    }
+
     const input = this.findFirstElement([
       '#BugCurrentOwnerValue',
       "[data-field-name='current_owner'] input#BugCurrentOwnerValue",
@@ -810,11 +817,75 @@ class TapdAutoFiller {
     return picked;
   }
 
+  async autoFillSpecialAssigneeV2(keyword) {
+    const ownerContainer = this.findFirstElement([
+      '.content-form__item.owner.user_choose',
+      '.content-form__item.owner',
+      '.field-name--owner'
+    ]);
+
+    const trigger = ownerContainer?.querySelector?.(
+      '.tapd-userselect-v2__users-container, .tapd-userselect-v2__selection-search, .form__item-content__value-label, .label-value'
+    ) || this.findFirstElement([
+      '.content-form__item.owner.user_choose .tapd-userselect-v2__users-container',
+      '.content-form__item.owner .tapd-userselect-v2__users-container',
+      '.field-name--owner .tapd-userselect-v2__users-container'
+    ]);
+
+    if (!trigger) return false;
+
+    this.dispatchClickSequence(trigger);
+    await this.delay(120);
+
+    const searchInput = this.findFirstElement([
+      '.tapd-userselect-v2__selection-search__input',
+      '.tapd-userselect-v2__users-container input[type="text"]'
+    ]);
+    if (searchInput) {
+      this.setInputValue(searchInput, keyword);
+      await this.delay(180);
+    }
+
+    const dropdown = this.findFirstElement([
+      '.tapd-userselect-v2__dropdown',
+      '.tapd-userselect-v2__dropdown-items-block'
+    ]) || document;
+
+    const optionItems = Array.from(dropdown.querySelectorAll(
+      '.tapd-userselect-v2__dropdown-item'
+    )).filter(el => this.isElementVisible(el));
+
+    if (!optionItems.length) return false;
+
+    const keywordNorm = this.normalizeText(keyword);
+    const byText = optionItems.find(item => {
+      const text = (item.querySelector('.tapd-userselect-v2__dropdown-item__text')?.textContent
+        || item.textContent
+        || '').trim();
+      const norm = this.normalizeText(text);
+      return norm.includes(keywordNorm) || keywordNorm.includes(norm);
+    });
+
+    const target = byText || optionItems[0];
+    this.dispatchClickSequence(target);
+    await this.delay(160);
+
+    const ownerText = ownerContainer?.textContent || '';
+    return this.normalizeText(ownerText).includes(keywordNorm);
+  }
+
   async autoFillSpecialIteration() {
     const keyword = (this.bugData?.iteration || '').trim();
     if (!keyword) {
       console.log('BST TAPD Filler: special iteration empty, skip');
       return false;
+    }
+
+    // TAPD 新版迭代控件（agi-tree-select）
+    const treePicked = await this.autoFillSpecialIterationTree(keyword);
+    if (treePicked) {
+      console.log('BST TAPD Filler: special iteration tree result', { keyword, picked: true });
+      return true;
     }
 
     const container = document.querySelector("[data-field-name='iteration_id']");
@@ -864,6 +935,62 @@ class TapdAutoFiller {
       value: matchedOptions[0].value
     });
     return true;
+  }
+
+  async autoFillSpecialIterationTree(keyword) {
+    const iterContainer = this.findFirstElement([
+      '.content-form__item.iteration_id.select',
+      '.content-form__item.iteration_id',
+      '.field-name--iteration_id'
+    ]);
+
+    const trigger = iterContainer?.querySelector?.(
+      '.form__item-content__value-label, .agi-tree-select__label-container, .label-value'
+    ) || this.findFirstElement([
+      '.content-form__item.iteration_id.select .form__item-content__value-label',
+      '.content-form__item.iteration_id .agi-tree-select__label-container'
+    ]);
+
+    if (!trigger) return false;
+
+    this.dispatchClickSequence(trigger);
+    await this.delay(140);
+
+    const dropdown = this.findFirstElement([
+      '.agi-tree-select__dropdown',
+      '.agi-tree-select__dropdown-container'
+    ]) || document;
+
+    const options = Array.from(dropdown.querySelectorAll(
+      '.agi-tree-select__dropdown__item'
+    )).filter(el => this.isElementVisible(el));
+    if (!options.length) return false;
+
+    const keywordNorm = this.normalizeText(keyword);
+    const keywordPrefix = this.normalizeText(keyword.replace(/（.*?）/g, '').replace(/\(.*?\)/g, ''));
+    const shortPrefix = this.normalizeText((keyword.match(/^(.*?-V\d+\.\d+)/)?.[1] || keywordPrefix));
+
+    const target = options.find(item => {
+      const text = (item.querySelector('.agi-tree-select__dropdown__item__label')?.textContent
+        || item.textContent
+        || '').trim();
+      const norm = this.normalizeText(text);
+      if (!norm) return false;
+      return norm.includes(keywordNorm)
+        || keywordNorm.includes(norm)
+        || (shortPrefix && norm.includes(shortPrefix))
+        || (keywordPrefix && norm.includes(keywordPrefix));
+    }) || options.find(item => {
+      const text = item.textContent || '';
+      return text.includes('当前迭代');
+    });
+
+    if (!target) return false;
+    this.dispatchClickSequence(target);
+    await this.delay(160);
+
+    const iterText = iterContainer?.textContent || '';
+    return this.normalizeText(iterText).includes(shortPrefix || keywordPrefix || keywordNorm);
   }
 
   isElementVisible(el) {
