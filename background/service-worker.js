@@ -310,7 +310,7 @@ class BackgroundService {
           const domain = result.config.tapd.domains && result.config.tapd.domains.length > 0
             ? result.config.tapd.domains[0]
             : 'tapd.cn';
-          tapdUrl = `https://www.${domain}/${projectId}/bugtrace/bugs/add`;
+          tapdUrl = `https://www.${domain}/tapd_fe/${projectId}/bug/create?workitem_type_id=bug`;
           console.log('BST Background: Using configured TAPD URL:', tapdUrl);
         } else {
           console.log('BST Background: No config found, using default TAPD URL:', tapdUrl);

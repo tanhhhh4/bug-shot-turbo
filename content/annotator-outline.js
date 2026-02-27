@@ -2131,7 +2131,7 @@ class ScreenshotAnnotator {
 
   async redirectToTAPD() {
     // Load configuration from storage
-    let tapdUrl = 'https://www.tapd.cn/47910877/bugtrace/bugs/add'; // fallback default
+    let tapdUrl = 'https://www.tapd.cn/tapd_fe/47910877/bug/create?workitem_type_id=bug'; // fallback default
     
     try {
       const result = await chrome.storage.local.get(['config']);
@@ -2140,7 +2140,7 @@ class ScreenshotAnnotator {
         const domain = result.config.tapd.domains && result.config.tapd.domains.length > 0 
           ? result.config.tapd.domains[0] 
           : 'tapd.cn';
-        tapdUrl = `https://www.${domain}/${projectId}/bugtrace/bugs/add`;
+        tapdUrl = `https://www.${domain}/tapd_fe/${projectId}/bug/create?workitem_type_id=bug`;
         console.log('BST: Using configured TAPD URL:', tapdUrl);
       } else {
         console.log('BST: No config found, using default TAPD URL:', tapdUrl);

@@ -77,14 +77,22 @@ class TapdAutoFiller {
       hasValidProjectId = projectIds.some(id => url.includes(`/${id}/`));
     }
 
-    // 检查是否是新建缺陷页面
+    // 检查是否是新建缺陷页面（兼容 TAPD 新旧路由）
     const isNewBug = url.includes('/bugtrace/bugs/add') ||
       url.includes('/bugtrace/bugs/addBUG') || // 添加大写BUG支持
       url.includes('/bug/add') ||
+      url.includes('/bug/create') ||
+      url.includes('/bug/new') ||
+      url.includes('workitem_type_id=bug') ||
       url.includes('view=addBug') ||
       url.includes('new_bug');
 
-    const isValid = isTapdDomain && hasValidProjectId && isNewBug;
+    // 路由不稳定时，使用页面结构兜底识别
+    const hasCreateBugSignals = !!document.querySelector(
+      "input[placeholder*='缺陷标题'], input[placeholder*='标题'], .cherry-editor textarea, [class*='cherry'] textarea"
+    );
+
+    const isValid = isTapdDomain && hasValidProjectId && (isNewBug || hasCreateBugSignals);
 
     if (isValid) {
       console.log('BST: Detected TAPD new bug page:', url);
@@ -258,6 +266,7 @@ class TapdAutoFiller {
 
       // 填充描述
       const descFilled = await this.fillDescription(description);
+      console.log('BST TAPD Filler: fill result', { titleFilled, descFilled });
 
       if (titleFilled && descFilled) {
         this.hasFilled = true;
@@ -355,6 +364,8 @@ class TapdAutoFiller {
         "input[name='bug_title']",
         "input[data-field='title']",
         this.config.selectors.title,
+        "input[placeholder='请输入缺陷标题']",
+        "input[placeholder*='缺陷标题']",
         "input[placeholder='插入标题']",
         "input[placeholder*='标题']",
         "input[placeholder*='Title']",
@@ -403,6 +414,54 @@ class TapdAutoFiller {
 
   async fillDescription(description) {
     try {
+      console.log('BST TAPD Filler: start fill description');
+      // 新版页面兜底：先按模板块定位编辑器并写入【问题描述】段落
+      const templateFilled = this.fillDescriptionByTemplateBlock(description);
+      if (templateFilled) {
+        console.log('BST TAPD Filler: description filled by template block');
+        return true;
+      }
+
+      // 新版 TAPD（Cherry 编辑器）优先
+      const modernSelectors = [
+        ".cherry-editor textarea",
+        ".cherry textarea",
+        "[class*='cherry'] textarea",
+        "textarea[placeholder*='问题描述']",
+        "textarea[placeholder*='描述']",
+        ".ProseMirror",
+        ".cherry-previewer[contenteditable='true']",
+        "div[contenteditable='true'][data-placeholder*='问题']",
+        "[contenteditable='true']",
+        "[contenteditable='plaintext-only']",
+        "[contenteditable]",
+        "[role='textbox']",
+        this.config?.selectors?.descBody
+      ];
+
+      for (const selector of modernSelectors) {
+        const element = document.querySelector(selector);
+        if (!element) continue;
+        if (!this.isElementVisible(element)) continue;
+
+        if (element.tagName === 'TEXTAREA') {
+          const existingText = element.value || '';
+          const mergedText = this.mergeDescriptionForTemplate(existingText, description);
+          this.setTextareaValue(element, mergedText);
+          if (this.didDescriptionApply(element, description)) {
+            console.log('BST TAPD Filler: description filled by modern textarea', selector);
+            return true;
+          }
+          continue;
+        }
+
+        this.setContenteditableText(element, description);
+        if (this.didDescriptionApply(element, description)) {
+          console.log('BST TAPD Filler: description filled by modern editable', selector);
+          return true;
+        }
+      }
+
       // TAPD使用的是iframe富文本编辑器，优先查找iframe
       const iframeSelectors = [
         "iframe#BugDescription_ifr",
@@ -419,8 +478,8 @@ class TapdAutoFiller {
       ];
 
       for (const selector of iframeSelectors) {
-        const iframe = document.querySelector(selector);
-        if (iframe) {
+        const iframeList = Array.from(document.querySelectorAll(selector));
+        for (const iframe of iframeList) {
           try {
             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
             const bodySelectors = [
@@ -461,7 +520,13 @@ class TapdAutoFiller {
                 this.insertScreenshotIntoSection(iframeDoc, body);
                 this.moveCursorToScreenshotSection(iframeDoc, body);
 
-                return true;
+                if (this.didDescriptionApply(body, description)) {
+                  console.log('BST TAPD Filler: description filled by iframe', {
+                    selector,
+                    iframeId: iframe.id
+                  });
+                  return true;
+                }
               }
             }
           } catch (e) {
@@ -473,6 +538,10 @@ class TapdAutoFiller {
       // 如果iframe方式失败，尝试直接查找可编辑区域
       const directSelectors = [
         "div[contenteditable='true']",
+        "[contenteditable='true']",
+        "[contenteditable='plaintext-only']",
+        "[contenteditable]",
+        "[role='textbox']",
         "textarea[name*='description']",
         "textarea[name*='detail']",
         "textarea[name*='content']",
@@ -484,24 +553,36 @@ class TapdAutoFiller {
         ".editor-wrapper [contenteditable='true']",
         "[role='textbox']", // 富文本编辑器通常有这个role
         ".ql-editor", // Quill编辑器
-        ".w-e-text" // wangEditor
+        ".w-e-text", // wangEditor
+        this.config?.selectors?.descBody
       ];
 
       for (const selector of directSelectors) {
         const element = document.querySelector(selector);
         if (element) {
+          if (!this.isElementVisible(element)) continue;
           if (element.tagName === 'TEXTAREA') {
-            element.focus();
-            element.value = description;
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-            element.dispatchEvent(new Event('change', { bubbles: true }));
+            const mergedText = this.mergeDescriptionForTemplate(element.value || '', description);
+            this.setTextareaValue(element, mergedText);
+            if (this.didDescriptionApply(element, description)) {
+              console.log('BST TAPD Filler: description filled by direct textarea', selector);
+              return true;
+            }
           } else {
-            element.focus();
-            element.innerHTML = description.replace(/\n/g, '<br>');
-            element.dispatchEvent(new Event('input', { bubbles: true }));
+            this.setContenteditableText(element, description);
+            if (this.didDescriptionApply(element, description)) {
+              console.log('BST TAPD Filler: description filled by direct editable', selector);
+              return true;
+            }
           }
-          return true;
         }
+      }
+
+      // 结构化兜底：根据“【问题描述】”模板节点定位编辑区
+      const markerFilled = this.fillDescriptionByMarkerAnchor(description);
+      if (markerFilled) {
+        console.log('BST TAPD Filler: description filled by marker anchor fallback');
+        return true;
       }
 
       console.log('Description field not found');
@@ -524,7 +605,6 @@ class TapdAutoFiller {
 
   async autoSelectDropdowns(description, bugId = '') {
     const configs = this.dropdownConfigs || [];
-    if (!configs.length) return;
 
     // 合并可用文本：只取矩形文本+标签，避免额外敏感数据
     let combinedText = description || '';
@@ -543,6 +623,18 @@ class TapdAutoFiller {
       tagText
     ).catch(() => ({})) || {};
 
+    // 新版页面优先：AI 返回键名通常就是右侧字段名，直接按字段名选择
+    if (this.aiDropdownSuggestions && typeof this.aiDropdownSuggestions === 'object') {
+      for (const [fieldName, value] of Object.entries(this.aiDropdownSuggestions)) {
+        const keyword = (value || '').toString().trim();
+        if (!fieldName || !keyword) continue;
+        const ok = await this.pickDropdownByFieldName(fieldName, keyword);
+        console.log('BST TAPD Filler: AI field-name dropdown result', { fieldName, value: keyword, ok });
+      }
+    }
+
+    if (!configs.length) return;
+
     for (const cfg of configs) {
       if (this.isSpecialDropdownName(cfg?.name)) {
         continue;
@@ -554,6 +646,130 @@ class TapdAutoFiller {
         console.log('BST TAPD Filler: dropdown auto-select error', cfg?.name || '', e);
       }
     }
+  }
+
+  mergeDescriptionForTemplate(existingText = '', description = '') {
+    const desc = (description || '').trim();
+    if (!desc) return existingText || '';
+
+    const current = existingText || '';
+    if (!current.trim()) return desc;
+
+    if (current.includes(desc)) return current;
+
+    const markerPattern = /(【问题描述】[:：]?\s*\n?)/;
+    if (markerPattern.test(current)) {
+      return current.replace(markerPattern, `$1${desc}\n\n`);
+    }
+
+    return `${desc}\n\n${current}`;
+  }
+
+  fillDescriptionByTemplateBlock(description = '') {
+    const text = (description || '').trim();
+    if (!text) return false;
+
+    const candidateRoots = [
+      ...Array.from(document.querySelectorAll('textarea')),
+      ...Array.from(document.querySelectorAll('[contenteditable="true"]')),
+      ...Array.from(document.querySelectorAll('.ProseMirror, .ql-editor, .cherry-previewer, .cherry-editor, [class*="editor"]'))
+    ];
+
+    const root = candidateRoots.find(el => {
+      const t = (el.tagName === 'TEXTAREA' ? el.value : el.innerText || '').trim();
+      return t.includes('【问题描述】') && t.includes('【问题截图】');
+    });
+
+    if (!root) return false;
+
+    if (root.tagName === 'TEXTAREA') {
+      const merged = this.mergeDescriptionForTemplate(root.value || '', text);
+      this.setTextareaValue(root, merged);
+      return this.didDescriptionApply(root, text);
+    }
+
+    const rawText = (root.innerText || '').trim();
+    const mergedText = this.mergeDescriptionForTemplate(rawText, text);
+    this.setContenteditableText(root, mergedText);
+    return this.didDescriptionApply(root, text);
+  }
+
+  didDescriptionApply(el, description) {
+    const desc = (description || '').trim();
+    if (!el || !desc) return false;
+    const probe = desc.slice(0, 8);
+    const current = el.tagName === 'TEXTAREA'
+      ? (el.value || '')
+      : (el.innerText || el.textContent || '');
+    return current.includes(probe);
+  }
+
+  fillDescriptionByMarkerAnchor(description = '') {
+    const desc = (description || '').trim();
+    if (!desc) return false;
+
+    const markerNode = Array.from(document.querySelectorAll('div, p, span')).find(node => {
+      const text = (node.textContent || '').trim();
+      return text.includes('【问题描述】');
+    });
+    if (!markerNode) return false;
+
+    const formBlock = markerNode.closest('.content-form__item, .content-form__item-group-cuscontent, .content-fields-fullscreen') || document.body;
+    const editorCandidates = Array.from(formBlock.querySelectorAll(
+      "textarea, [contenteditable='true'], [role='textbox'], .ql-editor, .ProseMirror, .cherry-editor textarea, .cherry-previewer[contenteditable='true']"
+    ));
+
+    for (const el of editorCandidates) {
+      if (el.tagName === 'TEXTAREA') {
+        const merged = this.mergeDescriptionForTemplate(el.value || '', desc);
+        this.setTextareaValue(el, merged);
+      } else {
+        const current = (el.innerText || el.textContent || '').trim();
+        const merged = this.mergeDescriptionForTemplate(current, desc);
+        this.setContenteditableText(el, merged);
+      }
+      if (this.didDescriptionApply(el, desc)) return true;
+    }
+
+    return false;
+  }
+
+  setTextareaValue(textarea, value) {
+    if (!textarea) return;
+    textarea.focus();
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    if (setter) {
+      setter.call(textarea, value);
+    } else {
+      textarea.value = value;
+    }
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+  }
+
+  setContenteditableText(element, text) {
+    if (!element) return;
+    const target = element.matches?.('[contenteditable="true"]')
+      ? element
+      : (element.querySelector?.('[contenteditable="true"]') || element);
+
+    target.focus();
+
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('insertText', false, text);
+    } catch (e) {
+      target.innerText = text;
+    }
+
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
   }
 
   async autoFillSpecialFieldsInOrder() {
@@ -578,7 +794,9 @@ class TapdAutoFiller {
 
     if (!input) {
       console.log('BST TAPD Filler: special assignee input not found');
-      return false;
+      const byFieldName = await this.pickDropdownByFieldName('处理人', keyword);
+      console.log('BST TAPD Filler: special assignee field-name fallback', { keyword, byFieldName });
+      return byFieldName;
     }
 
     this.setInputValue(input, keyword);
@@ -623,7 +841,9 @@ class TapdAutoFiller {
     const selectEl = container?.querySelector?.('select');
     if (!selectEl) {
       console.log('BST TAPD Filler: special iteration input/select not found');
-      return false;
+      const byFieldName = await this.pickDropdownByFieldName('迭代', keyword);
+      console.log('BST TAPD Filler: special iteration field-name fallback', { keyword, byFieldName });
+      return byFieldName;
     }
 
     const options = this.collectNativeOptions(selectEl);
@@ -710,19 +930,31 @@ class TapdAutoFiller {
   }
 
   async autoSelectOneDropdown(cfg, normalizedDesc, aiValue) {
-    if (!cfg || !cfg.selectors) return;
+    if (!cfg) return;
 
-    const element = this.findElementBySelectors(cfg.selectors);
+    const element = this.findElementBySelectors(cfg.selectors || []);
     const type = cfg.type || (element && element.tagName === 'SELECT' ? 'native' : 'custom');
 
     const mappingHit = this.matchByMapping(normalizedDesc, cfg.mapping);
     const manualValue = this.getManualDropdownValue(cfg.name) || aiValue || this.bugData?.dropdownValue?.trim();
+
+    // 新版页面兜底：未命中旧选择器时，按字段名定位并选择
+    if (!element && manualValue && cfg?.name) {
+      const byFieldName = await this.pickDropdownByFieldName(cfg.name, manualValue);
+      if (byFieldName) {
+        console.log('BST TAPD Filler: dropdown selected by field name', { name: cfg.name, value: manualValue });
+        return;
+      }
+    }
 
     if (type === 'native' && element && element.tagName === 'SELECT') {
       const options = this.collectNativeOptions(element);
       const targetOption = this.pickOption(options, normalizedDesc, mappingHit, manualValue);
       if (!targetOption) {
         console.log('BST TAPD Filler: no match for dropdown', cfg.name, { aiValue, mappingHit, candidates: cfg.candidates });
+        if (cfg?.name && manualValue) {
+          await this.pickDropdownByFieldName(cfg.name, manualValue);
+        }
         return;
       }
       console.log('BST TAPD Filler: select native', { name: cfg.name, value: targetOption.value, aiValue, mappingHit });
@@ -734,12 +966,180 @@ class TapdAutoFiller {
     await this.openDropdown(element, cfg);
 
     const options = await this.collectCustomOptions(cfg);
-    if (!options.length) return;
+    if (!options.length) {
+      if (cfg?.name && manualValue) {
+        await this.pickDropdownByFieldName(cfg.name, manualValue);
+      }
+      return;
+    }
 
     const targetOption = this.pickOption(options, normalizedDesc, mappingHit, manualValue);
-    if (!targetOption || !targetOption.el) return;
+    if (!targetOption || !targetOption.el) {
+      if (cfg?.name && manualValue) {
+        await this.pickDropdownByFieldName(cfg.name, manualValue);
+      }
+      return;
+    }
 
     targetOption.el.click();
+  }
+
+  async pickDropdownByFieldName(fieldName, value) {
+    const nameNorm = this.normalizeText(fieldName);
+    const valueNorm = this.normalizeText(value);
+    if (!nameNorm || !valueNorm) return false;
+
+    // 新版 TAPD：先按固定结构精确定位字段容器
+    const preciseContainer = this.resolveTapdFieldContainerByName(fieldName);
+    if (preciseContainer) {
+      const precisePicked = await this.pickValueFromTapdContainer(preciseContainer, value, valueNorm);
+      if (precisePicked) return true;
+    }
+
+    const labelNodes = Array.from(document.querySelectorAll('label, span, div')).filter(node => {
+      if (!this.isElementVisible(node)) return false;
+      const text = (node.textContent || '').trim();
+      if (!text || text.length > 30) return false;
+      return this.normalizeText(text).includes(nameNorm);
+    });
+
+    for (const label of labelNodes) {
+      const row = label.closest('.content-form__item')
+        || label.parentElement?.closest?.('.content-form__item')
+        || label.parentElement?.parentElement?.closest?.('.content-form__item')
+        || label.closest("[class*='form-item'], [class*='field'], [class*='row'], li, tr")
+        || label.parentElement;
+      if (!row) continue;
+
+      const trigger = row.querySelector(
+        ".form__item-content__value-label, .label-value, .entity-detail-right-col__value .form__item-content__value-label, .entity-detail-right-col__value .label-value, .el-input__inner, input[type='text'], [role='combobox']"
+      );
+      if (!trigger || !this.isElementVisible(trigger)) continue;
+
+      this.dispatchClickSequence(trigger);
+      await this.delay(120);
+
+      if (trigger.tagName === 'INPUT') {
+        this.setInputValue(trigger, value);
+      }
+
+      const activeDropdown = this.getActiveDropdownRoot();
+      const optionRoot = activeDropdown || document;
+      const options = Array.from(optionRoot.querySelectorAll(
+        ".agi-select__options-item, .agi-select__options li, .el-select-dropdown__item, .el-select-dropdown li, [role='option']"
+      ))
+        .map(el => this.getClickableOptionNode(el))
+        .filter(el => el && this.isElementVisible(el) && !el.classList.contains('is-disabled'));
+
+      const exact = options.find(el => this.normalizeText(el.textContent || '') === valueNorm);
+      const include = options.find(el => this.normalizeText(el.textContent || '').includes(valueNorm));
+      const option = exact || include;
+      if (option) {
+        this.dispatchClickSequence(option);
+        await this.delay(120);
+        const rowTextAfterClick = row.textContent || '';
+        if (rowTextAfterClick.includes(value)) return true;
+      }
+
+      // typeahead 场景尝试回车确认首项
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      trigger.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+      await this.delay(80);
+      const rowTextAfterEnter = row.textContent || '';
+      if (rowTextAfterEnter.includes(value)) return true;
+    }
+
+    return false;
+  }
+
+  resolveTapdFieldContainerByName(fieldName = '') {
+    const n = this.normalizeText(fieldName);
+    const map = [
+      { aliases: ['优先级', 'priority'], selector: '.content-form__item.priority.select' },
+      { aliases: ['严重程度', 'severity'], selector: '.content-form__item.severity.select' },
+      { aliases: ['处理人', '负责人', 'owner', 'currentowner'], selector: '.content-form__item.owner.user_choose' },
+      { aliases: ['迭代', 'iteration', 'sprint'], selector: '.content-form__item.iteration_id.select' },
+      { aliases: ['bug类型', '类型'], selector: '.content-form__item.custom_field_one.select' },
+      { aliases: ['bug原因', '原因'], selector: '.content-form__item.custom_field_two.select' },
+      { aliases: ['bug来源', '来源'], selector: '.content-form__item.custom_field_three.select' },
+      { aliases: ['bug等级', '等级'], selector: '.content-form__item.custom_field_four.select' }
+    ];
+
+    for (const item of map) {
+      if (item.aliases.some(a => n.includes(this.normalizeText(a)))) {
+        const container = document.querySelector(item.selector);
+        if (container) return container;
+      }
+    }
+    return null;
+  }
+
+  async pickValueFromTapdContainer(container, value, valueNorm) {
+    const trigger = container.querySelector(
+      '.form__item-content__value-label, .label-value, .entity-detail-right-col__value .form__item-content__value-label, .entity-detail-right-col__value .label-value, .el-input__inner, [role="combobox"], input[type="text"]'
+    );
+    if (!trigger) return false;
+
+    this.dispatchClickSequence(trigger);
+    await this.delay(160);
+
+    const optionSelectors = [
+      '.agi-select__options-item',
+      '.agi-select__options li',
+      '.el-select-dropdown__item',
+      '.el-select-dropdown li',
+      '[role="option"]'
+    ].join(', ');
+
+    const activeDropdown = this.getActiveDropdownRoot();
+    const optionRoot = activeDropdown || document;
+    const options = Array.from(optionRoot.querySelectorAll(optionSelectors))
+      .map(el => this.getClickableOptionNode(el))
+      .filter(el => el && this.isElementVisible(el) && !el.classList.contains('is-disabled'));
+
+    const exact = options.find(el => this.normalizeText(el.textContent || '') === valueNorm);
+    const include = options.find(el => this.normalizeText(el.textContent || '').includes(valueNorm));
+    const target = exact || include;
+    if (!target) return false;
+
+    this.dispatchClickSequence(target);
+    await this.delay(120);
+    return (container.textContent || '').includes(value);
+  }
+
+  dispatchClickSequence(el) {
+    if (!el) return;
+    try {
+      if (typeof el.focus === 'function') el.focus();
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    } catch (e) {
+      console.log('BST TAPD Filler: dispatchClickSequence failed', e);
+    }
+  }
+
+  getClickableOptionNode(el) {
+    if (!el) return null;
+    if (el.matches('.agi-select__options-item, .el-select-dropdown__item, [role="option"], li')) return el;
+    return el.closest('.agi-select__options-item, .el-select-dropdown__item, [role="option"], li');
+  }
+
+  getActiveDropdownRoot() {
+    const roots = Array.from(document.querySelectorAll(
+      '.agi-select.select-menu, .agi-select__options, .el-select-dropdown.el-popper, .el-select-dropdown, .el-popper .el-select-dropdown, [role="listbox"]'
+    )).filter(el => this.isElementVisible(el));
+
+    if (!roots.length) return null;
+
+    roots.sort((a, b) => {
+      const za = Number(window.getComputedStyle(a).zIndex) || 0;
+      const zb = Number(window.getComputedStyle(b).zIndex) || 0;
+      return zb - za;
+    });
+    return roots[0];
   }
 
   getManualDropdownValue(name = '') {

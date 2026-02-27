@@ -1105,7 +1105,7 @@ var RectangleAnnotator = window.RectangleAnnotator || class RectangleAnnotator {
       if (result.config?.tapd?.projectIds?.length > 0) {
         const projectId = result.config.tapd.projectIds[0];
         const domain = result.config.tapd.domains?.[0] || 'tapd.cn';
-        tapdUrl = `https://www.${domain}/${projectId}/bugtrace/bugs/add`;
+        tapdUrl = `https://www.${domain}/tapd_fe/${projectId}/bug/create?workitem_type_id=bug`;
       }
     } catch (error) {
       console.warn('Failed to load config:', error);
